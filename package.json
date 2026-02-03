@@ -1,0 +1,43 @@
+{
+  "name": "agentshield",
+  "version": "0.1.0",
+  "description": "Security scanner for AI Agents and MCP Servers — like npm audit for AI",
+  "main": "dist/index.js",
+  "bin": {
+    "agentshield": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest --coverage",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "security",
+    "mcp",
+    "prompt-injection",
+    "audit",
+    "scanner"
+  ],
+  "author": "AgentShield Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "glob": "^10.3.0",
+    "js-yaml": "^4.1.0"
+  }
+}
