@@ -6,10 +6,10 @@ export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
   description: 'Tests for 110+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
 
-  async scan(targetPath: string): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath);
+    const files = await findPromptFiles(targetPath, options?.exclude);
 
     for (const file of files) {
       try {

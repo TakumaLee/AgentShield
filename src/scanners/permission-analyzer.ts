@@ -6,11 +6,11 @@ export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
   description: 'Analyzes agent resource access scope, flags over-privileged configurations, and identifies missing access controls',
 
-  async scan(targetPath: string): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const configFiles = await findConfigFiles(targetPath);
-    const promptFiles = await findPromptFiles(targetPath);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
 
     // Skip generic package manifests — they aren't agent configs

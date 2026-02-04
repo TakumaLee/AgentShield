@@ -38,10 +38,14 @@ export interface ReportSummary {
   duration: number;
 }
 
+export interface ScannerOptions {
+  exclude?: string[];
+}
+
 export interface ScannerModule {
   name: string;
   description: string;
-  scan(targetPath: string): Promise<ScanResult>;
+  scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult>;
 }
 
 export interface McpServerConfig {

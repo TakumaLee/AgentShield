@@ -22,11 +22,31 @@ const SCANNERS: ScannerModule[] = [
   redTeamSimulator,
 ];
 
+export type ProfileType = 'agent' | 'general' | 'mobile';
+
+/**
+ * Profile definitions: which scanners to run for each profile.
+ * Scanner names must match ScannerModule.name exactly.
+ */
+const PROFILE_SCANNERS: Record<ProfileType, string[] | null> = {
+  agent: null, // all scanners
+  general: ['Secret Leak Scanner', 'Permission Analyzer', 'Skill Auditor'],
+  mobile: ['Secret Leak Scanner', 'Permission Analyzer'],
+};
+
+export function filterScannersByProfile(scanners: ScannerModule[], profile: ProfileType): ScannerModule[] {
+  const allowed = PROFILE_SCANNERS[profile];
+  if (allowed === null) return scanners;
+  return scanners.filter(s => allowed.includes(s.name));
+}
+
 export interface ScanOptions {
   output?: string;
   json?: boolean;
   scanners?: string[];
   verbose?: boolean;
+  exclude?: string[];
+  profile?: ProfileType;
 }
 
 export async function runScan(targetPath: string, options: ScanOptions = {}): Promise<ScanReport> {
@@ -40,9 +60,15 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   console.log('');
   console.log(chalk.cyan('  🛡️  AgentShield scanning...'));
   console.log(chalk.gray(`  Target: ${absPath}`));
+  if (options.profile && options.profile !== 'agent') {
+    console.log(chalk.gray(`  Profile: ${options.profile}`));
+  }
+  if (options.exclude && options.exclude.length > 0) {
+    console.log(chalk.gray(`  Exclude: ${options.exclude.join(', ')}`));
+  }
   console.log('');
 
-  // Filter scanners if specified
+  // Filter scanners: --scanners takes priority over --profile
   let activeScanners = SCANNERS;
   if (options.scanners && options.scanners.length > 0) {
     activeScanners = SCANNERS.filter(s =>
@@ -50,7 +76,14 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
         s.name.toLowerCase().includes(name.toLowerCase())
       )
     );
+  } else if (options.profile) {
+    activeScanners = filterScannersByProfile(SCANNERS, options.profile);
   }
+
+  // Scanner options (exclude patterns)
+  const scannerOptions = options.exclude && options.exclude.length > 0
+    ? { exclude: options.exclude }
+    : undefined;
 
   // Run all scanners with progress
   const results = [];
@@ -66,7 +99,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     // Clear line and print progress
     process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name}...`);
 
-    const result = await scanner.scan(absPath);
+    const result = await scanner.scan(absPath, scannerOptions);
     results.push(result);
 
     // Update with result

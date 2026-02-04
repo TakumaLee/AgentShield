@@ -41,8 +41,24 @@ const DEFAULT_IGNORE = [
   '**/.nuxt/**',
   '**/.cache/**',
   '**/tmp/**',
+  '**/DerivedData/**',
   '**/agentshield-report*.json',
 ];
+
+/**
+ * Merge user-provided exclude patterns with the default ignore list.
+ * User patterns are normalized to glob format: "foo" → "**​/foo/**"
+ */
+export function buildIgnoreList(userExcludes?: string[]): string[] {
+  if (!userExcludes || userExcludes.length === 0) return DEFAULT_IGNORE;
+  const extra = userExcludes.map(p => {
+    // If already a glob pattern, use as-is
+    if (p.includes('*') || p.includes('/')) return p;
+    // Otherwise, treat as directory name to exclude
+    return `**/${p}/**`;
+  });
+  return [...DEFAULT_IGNORE, ...extra];
+}
 
 // Files that are likely test/doc context — findings here get severity downgraded
 const TEST_DOC_PATTERNS = [
@@ -69,16 +85,17 @@ export function isTestOrDocFile(filePath: string): boolean {
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 
-export async function findFiles(targetPath: string, patterns: string[]): Promise<string[]> {
+export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[]): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
+  const ignoreList = buildIgnoreList(excludePatterns);
 
   for (const pattern of patterns) {
     const files = await glob(pattern, {
       cwd: absTarget,
       absolute: true,
       nodir: true,
-      ignore: DEFAULT_IGNORE,
+      ignore: ignoreList,
     });
     results.push(...files);
   }
@@ -95,7 +112,7 @@ export async function findFiles(targetPath: string, patterns: string[]): Promise
   });
 }
 
-export async function findConfigFiles(targetPath: string): Promise<string[]> {
+export async function findConfigFiles(targetPath: string, excludePatterns?: string[]): Promise<string[]> {
   return findFiles(targetPath, [
     '**/*.json',
     '**/*.yaml',
@@ -106,10 +123,10 @@ export async function findConfigFiles(targetPath: string): Promise<string[]> {
     '**/mcp*.yaml',
     '**/mcp*.yml',
     '**/claude_desktop_config.json',
-  ]);
+  ], excludePatterns);
 }
 
-export async function findPromptFiles(targetPath: string): Promise<string[]> {
+export async function findPromptFiles(targetPath: string, excludePatterns?: string[]): Promise<string[]> {
   // Tier 1: High-signal agent/prompt files (always scan)
   const agentFiles = await findFiles(targetPath, [
     '**/*prompt*',
@@ -130,7 +147,7 @@ export async function findPromptFiles(targetPath: string): Promise<string[]> {
     '**/*settings*.json',
     '**/*settings*.yaml',
     '**/.env*',
-  ]);
+  ], excludePatterns);
 
   // Tier 2: General files but only in small projects (< 200 files)
   // For large projects, only scan agent-specific files
@@ -143,7 +160,7 @@ export async function findPromptFiles(targetPath: string): Promise<string[]> {
     '**/*.ts',
     '**/*.js',
     '**/*.py',
-  ]);
+  ], excludePatterns);
 
   // If project is large, only use Tier 1 files
   if (allSourceFiles.length > 200) {

@@ -18,6 +18,8 @@ program
   .option('--json', 'Always output JSON report')
   .option('-s, --scanners <names...>', 'Run only specific scanners (prompt, mcp, secret, permission, defense, skill, redteam)')
   .option('-v, --verbose', 'Show detailed progress')
+  .option('-e, --exclude <patterns...>', 'Additional glob patterns to exclude (on top of default excludes)')
+  .option('-p, --profile <type>', 'Scanner profile: agent (all, default), general (secret+permission+skill), mobile (secret+permission)', 'agent')
   .action(async (targetPath: string, options) => {
     try {
       const report = await runScan(targetPath, options);

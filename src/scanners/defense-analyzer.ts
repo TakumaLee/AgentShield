@@ -204,10 +204,10 @@ export const defenseAnalyzer: ScannerModule = {
   name: 'Defense Analyzer',
   description: 'Checks if a codebase has proper injection defenses including input sanitization, prompt hardening, output filtering, sandboxing, auth, and canary tokens',
 
-  async scan(targetPath: string): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath);
+    const files = await findPromptFiles(targetPath, options?.exclude);
 
     // Aggregate defense signals across all files
     const categoryResults = new Map<string, { totalWeight: number; matchedPatterns: string[]; files: string[] }>();
