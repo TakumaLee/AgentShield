@@ -1,6 +1,6 @@
 import * as path from 'path';
 import chalk from 'chalk';
-import { ScanReport, ScannerModule } from './types';
+import { ScanReport, ScannerModule, ScanContext } from './types';
 import { promptInjectionTester } from './scanners/prompt-injection-tester';
 import { mcpConfigAuditor } from './scanners/mcp-config-auditor';
 import { secretLeakScanner } from './scanners/secret-leak-scanner';
@@ -47,6 +47,7 @@ export interface ScanOptions {
   verbose?: boolean;
   exclude?: string[];
   profile?: ProfileType;
+  context?: ScanContext;
 }
 
 export async function runScan(targetPath: string, options: ScanOptions = {}): Promise<ScanReport> {
@@ -62,6 +63,9 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   console.log(chalk.gray(`  Target: ${absPath}`));
   if (options.profile && options.profile !== 'agent') {
     console.log(chalk.gray(`  Profile: ${options.profile}`));
+  }
+  if (options.context && options.context !== 'app') {
+    console.log(chalk.gray(`  Context: ${options.context}`));
   }
   if (options.exclude && options.exclude.length > 0) {
     console.log(chalk.gray(`  Exclude: ${options.exclude.join(', ')}`));
@@ -80,10 +84,14 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     activeScanners = filterScannersByProfile(SCANNERS, options.profile);
   }
 
-  // Scanner options (exclude patterns)
-  const scannerOptions = options.exclude && options.exclude.length > 0
-    ? { exclude: options.exclude }
-    : undefined;
+  // Scanner options (exclude patterns + context)
+  const scannerOptions: { exclude?: string[]; context?: ScanContext } = {};
+  if (options.exclude && options.exclude.length > 0) {
+    scannerOptions.exclude = options.exclude;
+  }
+  if (options.context) {
+    scannerOptions.context = options.context;
+  }
 
   // Run all scanners with progress
   const results = [];
@@ -99,7 +107,8 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     // Clear line and print progress
     process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name}...`);
 
-    const result = await scanner.scan(absPath, scannerOptions);
+    const hasOptions = scannerOptions.exclude || scannerOptions.context;
+    const result = await scanner.scan(absPath, hasOptions ? scannerOptions : undefined);
     results.push(result);
 
     // Update with result

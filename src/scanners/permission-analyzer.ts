@@ -1,17 +1,25 @@
 import * as yaml from 'js-yaml';
-import { ScannerModule, ScanResult, Finding } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
   description: 'Analyzes agent resource access scope, flags over-privileged configurations, and identifies missing access controls',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
+    const context = options?.context || 'app';
     const configFiles = await findConfigFiles(targetPath, options?.exclude);
     const promptFiles = await findPromptFiles(targetPath, options?.exclude);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
+
+    // For framework context, check if any auth-related files exist in the project
+    let projectHasAuthFiles = false;
+    if (context === 'framework') {
+      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude);
+      projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
+    }
 
     // Skip generic package manifests — they aren't agent configs
     const SKIP_CONFIG_PATTERNS = [
@@ -56,6 +64,16 @@ export const permissionAnalyzer: ScannerModule = {
         // (re-check findings added in this iteration)
       } catch {
         // Skip unreadable files
+      }
+    }
+
+    // Framework context: downgrade "No authentication configured" if auth files exist
+    if (context === 'framework' && projectHasAuthFiles) {
+      for (const f of findings) {
+        if (f.title === 'No authentication configured' && f.severity !== 'info') {
+          f.severity = 'info';
+          f.description += ' [Authentication modules detected but may not cover all entry points.]';
+        }
       }
     }
 

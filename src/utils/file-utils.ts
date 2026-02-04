@@ -171,6 +171,93 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
   return [...new Set([...agentFiles, ...allSourceFiles])];
 }
 
+// === Context-aware file classification helpers ===
+
+/**
+ * Files whose primary job is managing credentials/tokens/auth.
+ * Findings in these files get downgraded in framework context.
+ */
+const CREDENTIAL_MANAGEMENT_PATTERNS = [
+  /[/\\]credentials?\.[jt]sx?$/i,
+  /[/\\]tokens?\.[jt]sx?$/i,
+  /[/\\]accounts?\.[jt]sx?$/i,
+  /[/\\]auth\.[jt]sx?$/i,
+  /[/\\]auth-store\.[jt]sx?$/i,
+  /[/\\]key-manager\.[jt]sx?$/i,
+  /[/\\]secret-manager\.[jt]sx?$/i,
+  /[/\\]vault\.[jt]sx?$/i,
+];
+
+export function isCredentialManagementFile(filePath: string): boolean {
+  return CREDENTIAL_MANAGEMENT_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
+ * Framework infrastructure directories — path traversal / shell exec
+ * is more expected here than in user-facing input code.
+ */
+const FRAMEWORK_DIR_PATTERNS = [
+  /[/\\]src[/\\]/i,
+  /[/\\]lib[/\\]/i,
+  /[/\\]dist[/\\]/i,
+  /[/\\]core[/\\]/i,
+  /[/\\]internal[/\\]/i,
+  /[/\\]utils[/\\]/i,
+  /[/\\]extensions[/\\]/i,
+];
+
+export function isFrameworkInfraFile(filePath: string): boolean {
+  return FRAMEWORK_DIR_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
+ * Files that handle user-facing input — findings here stay at original severity.
+ */
+const USER_INPUT_FILE_PATTERNS = [
+  /handler/i,
+  /controller/i,
+  /route/i,
+  /[/\\]api[/\\]/i,
+  /endpoint/i,
+  /input/i,
+  /parse/i,
+];
+
+export function isUserInputFile(filePath: string): boolean {
+  const basename = filePath.split(/[/\\]/).pop() || '';
+  return USER_INPUT_FILE_PATTERNS.some(p => p.test(basename)) ||
+    USER_INPUT_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
+ * Files inside skill/plugin directories — keep strict severity.
+ */
+const SKILL_PLUGIN_DIR_PATTERNS = [
+  /[/\\]skills?[/\\]/i,
+  /[/\\]plugins?[/\\]/i,
+  /[/\\]addons?[/\\]/i,
+  /[/\\]modules[/\\]/i,
+];
+
+export function isSkillPluginFile(filePath: string): boolean {
+  return SKILL_PLUGIN_DIR_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
+ * Check if a project has any auth-related files.
+ */
+export function hasAuthFiles(files: string[]): boolean {
+  const AUTH_FILE_PATTERNS = [
+    /[/\\]auth/i,
+    /[/\\]credentials?/i,
+    /[/\\]pairing/i,
+    /[/\\]login/i,
+    /[/\\]session/i,
+    /[/\\]oauth/i,
+  ];
+  return files.some(f => AUTH_FILE_PATTERNS.some(p => p.test(f)));
+}
+
 export function isJsonFile(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === '.json';
 }

@@ -1,5 +1,5 @@
-import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, Severity, ScanContext } from '../types';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -240,13 +240,50 @@ export function auditSkillContent(content: string, filePath: string): Finding[] 
   return findings;
 }
 
+/**
+ * Apply framework-aware severity downgrades.
+ * Only called when --context framework is active.
+ */
+export function applyFrameworkDowngrades(findings: Finding[], filePath: string): void {
+  const inFrameworkDir = isFrameworkInfraFile(filePath);
+  const inUserInputFile = isUserInputFile(filePath);
+  const inSkillPlugin = isSkillPluginFile(filePath);
+
+  for (const f of findings) {
+    // Path traversal (SA-006): downgrade in framework infra, keep in user-input files
+    if (f.id.startsWith('SA-006-') && inFrameworkDir && !inUserInputFile) {
+      if (f.severity === 'high') {
+        f.severity = 'medium';
+        f.description += ' [Framework infrastructure file — path traversal less likely to be exploitable here.]';
+      }
+    }
+
+    // Shell execution capability (SA-003d): downgrade in core, keep in skills/plugins
+    if (f.id.startsWith('SA-003d-') && !inSkillPlugin) {
+      if (f.severity === 'medium') {
+        f.severity = 'info';
+        f.description += ' [Framework-level shell capability — expected for AI Agent runtimes. Verify input sanitization before command execution.]';
+      }
+    }
+
+    // .env / credential file reading (SA-002): downgrade if not combined with network exfil
+    // SA-001/SA-001b/SA-001c are env exfiltration (keep critical)
+    // SA-002 "Reading sensitive file" — downgrade standalone reads (not SA-002b which is read+network)
+    if (f.id.startsWith('SA-002-') && f.title === 'Reading sensitive file') {
+      f.severity = 'info';
+      f.description += ' [Standard environment variable loading (12-factor app pattern). Verify .env is in .gitignore.]';
+    }
+  }
+}
+
 export const skillAuditor: ScannerModule = {
   name: 'Skill Auditor',
   description: 'Scans third-party skills, plugins, and tools for suspicious behavior including data exfiltration, shell injection, and privilege escalation',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
+    const context = options?.context || 'app';
 
     const files = await findFiles(targetPath, [
       '**/*.js',
@@ -259,6 +296,11 @@ export const skillAuditor: ScannerModule = {
       try {
         const content = readFileContent(file);
         const fileFindings = auditSkillContent(content, file);
+
+        // Framework context: apply smart downgrades
+        if (context === 'framework') {
+          applyFrameworkDowngrades(fileFindings, file);
+        }
 
         // Downgrade test/doc findings
         if (isTestOrDocFile(file)) {

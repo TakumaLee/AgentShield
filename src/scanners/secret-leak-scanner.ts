@@ -1,14 +1,15 @@
-import { ScannerModule, ScanResult, Finding } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 
 export const secretLeakScanner: ScannerModule = {
   name: 'Secret Leak Scanner',
   description: 'Scans system prompts, tool definitions, and configuration files for hardcoded secrets, API keys, tokens, and sensitive paths',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
+    const context = options?.context || 'app';
     const files = await findPromptFiles(targetPath, options?.exclude);
 
     for (const file of files) {
@@ -19,6 +20,17 @@ export const secretLeakScanner: ScannerModule = {
           ...scanForSensitivePaths(content, file),
           ...scanForHardcodedCredentials(content, file),
         ];
+
+        // Framework context: downgrade credential management files
+        if (context === 'framework' && isCredentialManagementFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [Credential management module — reading secrets is this module\'s intended function. Verify secrets are not logged or exposed.]';
+            }
+          }
+        }
+
         // Downgrade test/doc findings
         if (isTestOrDocFile(file)) {
           for (const f of fileFindings) {

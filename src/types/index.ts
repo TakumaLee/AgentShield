@@ -1,5 +1,13 @@
 export type Severity = 'critical' | 'high' | 'medium' | 'info';
 
+/**
+ * Scan context controls how findings are severity-adjusted:
+ *  - app: default — standard scanning
+ *  - framework: framework-aware downgrades for expected patterns
+ *  - skill: strict — no downgrades (third-party skill/plugin scanning)
+ */
+export type ScanContext = 'app' | 'framework' | 'skill';
+
 export interface Finding {
   id: string;
   scanner: string;
@@ -40,6 +48,7 @@ export interface ReportSummary {
 
 export interface ScannerOptions {
   exclude?: string[];
+  context?: ScanContext;
 }
 
 export interface ScannerModule {
