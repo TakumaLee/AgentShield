@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles } from '../utils/file-utils';
 
 interface DefenseCategory {
   id: string;
@@ -135,6 +135,147 @@ const DEFENSE_CATEGORIES: DefenseCategory[] = [
   },
 ];
 
+// === DF-007: Prompt Leak Protection ===
+
+/** Patterns that indicate sensitive data embedded in prompts/system files */
+const SENSITIVE_DATA_PATTERNS: { pattern: RegExp; desc: string }[] = [
+  { pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[A-Za-z0-9_\-]{16,}/i, desc: 'API key' },
+  { pattern: /(?:secret|password|passwd|pwd)\s*[:=]\s*["']?[^\s"']{8,}/i, desc: 'secret/password' },
+  { pattern: /https?:\/\/[^\s"']*[?&](?:token|key|secret|api_key)=[^\s"'&]+/i, desc: 'URL with embedded token' },
+  { pattern: /(?:mongodb|postgres|mysql|redis|amqp):\/\/[^\s"']+/i, desc: 'database connection string' },
+  { pattern: /(?:internal|private)[_-]?(?:endpoint|api|url|host)\s*[:=]\s*["']?https?:\/\//i, desc: 'internal endpoint' },
+  { pattern: /Bearer\s+[A-Za-z0-9_\-\.]{20,}/i, desc: 'Bearer token' },
+  { pattern: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/i, desc: 'private key' },
+  { pattern: /sk-[A-Za-z0-9]{20,}/i, desc: 'OpenAI-style API key' },
+  { pattern: /ghp_[A-Za-z0-9]{36,}/i, desc: 'GitHub personal access token' },
+  { pattern: /xox[bpsar]-[A-Za-z0-9\-]+/i, desc: 'Slack token' },
+];
+
+/** Patterns that indicate prompt-level leak protection (weak defense layer) */
+const PROMPT_LEVEL_PROTECTION_PATTERNS: { pattern: RegExp; weight: number; desc: string }[] = [
+  { pattern: /never\s+reveal\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions)/i, weight: 2, desc: 'never reveal instructions' },
+  { pattern: /do\s+not\s+share\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions)/i, weight: 2, desc: 'do not share instructions' },
+  { pattern: /refuse\s+to\s+(?:output|reveal|share|disclose)\s+(?:your\s+)?(?:system\s+)?prompt/i, weight: 2, desc: 'refuse to output system prompt' },
+  { pattern: /(?:keep|maintain)\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions)\s+(?:secret|private|confidential)/i, weight: 2, desc: 'keep prompt secret' },
+  { pattern: /(?:do\s+not|never|don'?t)\s+(?:output|print|display|echo|repeat)\s+(?:your\s+)?(?:system|initial)\s+(?:prompt|instructions|message)/i, weight: 2, desc: 'do not output system prompt' },
+  { pattern: /if\s+(?:asked|someone\s+asks)\s+(?:for|about)\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions).*(?:refuse|decline|ignore|deny)/i, weight: 2, desc: 'refuse prompt extraction attempts' },
+];
+
+/** Patterns indicating server-side architecture (positive for prompt leak defense) */
+const SERVER_SIDE_PATTERNS: { pattern: RegExp; weight: number; desc: string }[] = [
+  { pattern: /(?:app|router)\.(get|post|put|delete|patch)\s*\(/i, weight: 2, desc: 'API route handler' },
+  { pattern: /(?:express|fastify|koa|hono|next)\s*[\.(]/i, weight: 1, desc: 'server framework' },
+  { pattern: /(?:req|request)\s*\.\s*(?:body|params|query)/i, weight: 1, desc: 'request parsing' },
+  { pattern: /(?:res|response)\s*\.\s*(?:json|send|status)/i, weight: 1, desc: 'response handling' },
+  { pattern: /middleware/i, weight: 1, desc: 'middleware pattern' },
+];
+
+export interface PromptLeakAnalysis {
+  sensitiveDataFound: { desc: string; file: string }[];
+  hasOutputFiltering: boolean;
+  promptProtectionWeight: number;
+  promptProtectionPatterns: string[];
+  serverSideWeight: number;
+  serverSidePatterns: string[];
+}
+
+export function analyzeSensitiveDataInPrompt(content: string, filePath: string): { desc: string; file: string }[] {
+  const found: { desc: string; file: string }[] = [];
+  for (const p of SENSITIVE_DATA_PATTERNS) {
+    if (p.pattern.test(content)) {
+      found.push({ desc: p.desc, file: filePath });
+    }
+  }
+  return found;
+}
+
+export function analyzePromptLevelProtection(content: string): { weight: number; patterns: string[] } {
+  let weight = 0;
+  const patterns: string[] = [];
+  for (const p of PROMPT_LEVEL_PROTECTION_PATTERNS) {
+    if (p.pattern.test(content)) {
+      weight += p.weight;
+      patterns.push(p.desc);
+    }
+  }
+  return { weight, patterns };
+}
+
+export function analyzeServerSideArchitecture(content: string): { weight: number; patterns: string[] } {
+  let weight = 0;
+  const patterns: string[] = [];
+  for (const p of SERVER_SIDE_PATTERNS) {
+    if (p.pattern.test(content)) {
+      weight += p.weight;
+      patterns.push(p.desc);
+    }
+  }
+  return { weight, patterns };
+}
+
+export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetPath: string): Finding[] {
+  const findings: Finding[] = [];
+  const hasSensitiveData = analysis.sensitiveDataFound.length > 0;
+  const hasOutputFiltering = analysis.hasOutputFiltering;
+  const hasPromptProtection = analysis.promptProtectionWeight > 0;
+  const hasServerSide = analysis.serverSideWeight >= 3;
+
+  // If sensitive data found in prompts, always report it
+  if (hasSensitiveData) {
+    const dataTypes = [...new Set(analysis.sensitiveDataFound.map(d => d.desc))].join(', ');
+    const severity: Severity = hasOutputFiltering ? 'high' : 'critical';
+    findings.push({
+      id: 'DF-007-SENSITIVE',
+      scanner: 'defense-analyzer',
+      severity,
+      title: 'System prompt contains sensitive data',
+      description: `System prompt or configuration contains sensitive data (${dataTypes}) that would be exposed if the prompt is leaked.${hasOutputFiltering ? ' Output filtering exists but may not fully prevent extraction.' : ' No output filtering detected to prevent extraction.'}`,
+      file: targetPath,
+      recommendation: 'Remove sensitive data (API keys, tokens, connection strings) from prompts. Store them server-side in environment variables or secret managers, never in prompt text.',
+    });
+  }
+
+  // Assess overall prompt leak protection posture
+  if (hasSensitiveData && !hasOutputFiltering) {
+    // Already covered by SENSITIVE finding above as critical
+  } else if (!hasSensitiveData && !hasOutputFiltering) {
+    findings.push({
+      id: 'DF-007-NOFILTER',
+      scanner: 'defense-analyzer',
+      severity: 'high',
+      title: 'No prompt leak protection',
+      description: 'No output filtering or prompt leak prevention mechanisms detected. System prompts could be extracted through prompt injection.',
+      file: targetPath,
+      recommendation: 'Add output filtering to detect and block prompt leak attempts. Implement response guards that check if output contains system prompt content.',
+    });
+  } else if (!hasSensitiveData && hasOutputFiltering && !hasPromptProtection && !hasServerSide) {
+    findings.push({
+      id: 'DF-007-PARTIAL',
+      scanner: 'defense-analyzer',
+      severity: 'medium',
+      title: 'Partial prompt leak protection',
+      description: 'Output filtering exists but no additional prompt-level or architecture-level protection layers detected. Defense-in-depth is recommended.',
+      file: targetPath,
+      recommendation: 'Add prompt-level instructions to refuse system prompt disclosure. Move sensitive logic server-side where possible. Use canary tokens to detect leaks.',
+    });
+  }
+
+  // Note weak prompt-level protection if that's the only layer
+  if (hasPromptProtection && !hasOutputFiltering) {
+    findings.push({
+      id: 'DF-007-WEAKONLY',
+      scanner: 'defense-analyzer',
+      severity: 'medium',
+      title: 'Prompt leak protection relies on weak layer only',
+      description: `Prompt-level protection found (${analysis.promptProtectionPatterns.join(', ')}) but this is a weak defense layer that can be bypassed through prompt injection. No output filtering detected.`,
+      file: targetPath,
+      recommendation: 'Prompt-level instructions alone are insufficient. Add output filtering/guardrails that programmatically detect and block prompt leak attempts.',
+    });
+  }
+
+  return findings;
+}
+
 export function analyzeDefenses(content: string, filePath: string): { category: string; id: string; totalWeight: number; matchedPatterns: string[] }[] {
   const results: { category: string; id: string; totalWeight: number; matchedPatterns: string[] }[] = [];
 
@@ -241,6 +382,61 @@ export const defenseAnalyzer: ScannerModule = {
 
     // Generate findings based on aggregated results
     const defenseFindings = generateDefenseFindings(categoryResults, targetPath);
+
+    // === DF-007: Prompt Leak Protection (cross-cutting analysis) ===
+    const promptLeakAnalysis: PromptLeakAnalysis = {
+      sensitiveDataFound: [],
+      hasOutputFiltering: false,
+      promptProtectionWeight: 0,
+      promptProtectionPatterns: [],
+      serverSideWeight: 0,
+      serverSidePatterns: [],
+    };
+
+    // Check output filtering from DF-003 results
+    const df003 = categoryResults.get('DF-003');
+    if (df003 && df003.totalWeight >= 4) {
+      promptLeakAnalysis.hasOutputFiltering = true;
+    }
+
+    // Scan all files for sensitive data, prompt protection, and server-side patterns
+    // Also include source files for architecture analysis
+    let sourceFiles: string[] = [];
+    try {
+      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude);
+    } catch {
+      // Ignore errors finding source files
+    }
+    const allAnalysisFiles = [...new Set([...files, ...sourceFiles])];
+
+    for (const file of allAnalysisFiles) {
+      try {
+        const content = readFileContent(file);
+
+        // Check for sensitive data in prompt-like files
+        const sensitiveHits = analyzeSensitiveDataInPrompt(content, file);
+        promptLeakAnalysis.sensitiveDataFound.push(...sensitiveHits);
+
+        // Check for prompt-level protection
+        const promptProt = analyzePromptLevelProtection(content);
+        promptLeakAnalysis.promptProtectionWeight += promptProt.weight;
+        promptLeakAnalysis.promptProtectionPatterns.push(...promptProt.patterns);
+
+        // Check for server-side architecture
+        const serverSide = analyzeServerSideArchitecture(content);
+        promptLeakAnalysis.serverSideWeight += serverSide.weight;
+        promptLeakAnalysis.serverSidePatterns.push(...serverSide.patterns);
+      } catch {
+        // Skip unreadable files
+      }
+    }
+
+    // Deduplicate
+    promptLeakAnalysis.promptProtectionPatterns = [...new Set(promptLeakAnalysis.promptProtectionPatterns)];
+    promptLeakAnalysis.serverSidePatterns = [...new Set(promptLeakAnalysis.serverSidePatterns)];
+
+    const promptLeakFindings = generatePromptLeakFindings(promptLeakAnalysis, targetPath);
+    defenseFindings.push(...promptLeakFindings);
 
     // Downgrade test/doc findings
     for (const f of defenseFindings) {

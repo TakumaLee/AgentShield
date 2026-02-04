@@ -60,6 +60,9 @@ export const permissionAnalyzer: ScannerModule = {
         // Analyze text content for permission-related patterns
         findings.push(...analyzeTextPermissions(content, file));
 
+        // Analyze tool permission boundaries
+        findings.push(...analyzeToolPermissionBoundaries(content, file));
+
         // Downgrade test/doc findings
         // (re-check findings added in this iteration)
       } catch {
@@ -67,12 +70,26 @@ export const permissionAnalyzer: ScannerModule = {
       }
     }
 
-    // Framework context: downgrade "No authentication configured" if auth files exist
-    if (context === 'framework' && projectHasAuthFiles) {
+    // Framework context downgrades
+    if (context === 'framework') {
+      // Downgrade "No authentication configured" if auth files exist
+      if (projectHasAuthFiles) {
+        for (const f of findings) {
+          if (f.title === 'No authentication configured' && f.severity !== 'info') {
+            f.severity = 'info';
+            f.description += ' [Authentication modules detected but may not cover all entry points.]';
+          }
+        }
+      }
+      // Downgrade tool permission findings — frameworks define tools but permission
+      // boundaries are configured by end users, not hardcoded in framework source
       for (const f of findings) {
-        if (f.title === 'No authentication configured' && f.severity !== 'info') {
+        if (f.id?.startsWith('PERM-TOOL-UNRESTRICTED') && f.severity === 'critical') {
           f.severity = 'info';
-          f.description += ' [Authentication modules detected but may not cover all entry points.]';
+          f.description += ' [Framework context: tool permission boundaries are typically configured by end users, not hardcoded in framework source.]';
+        } else if (f.id?.startsWith('PERM-TOOL-PARTIAL') && f.severity === 'high') {
+          f.severity = 'info';
+          f.description += ' [Framework context: partial boundaries detected in framework code; full configuration is delegated to end users.]';
         }
       }
     }
@@ -238,6 +255,75 @@ function checkFilesystemScope(config: Record<string, unknown>, filePath?: string
         });
       }
     }
+  }
+
+  return findings;
+}
+
+// === Tool Permission Boundary Analysis ===
+
+const ALLOWLIST_PATTERNS = [
+  /allowlist/i, /whitelist/i, /allowed[_-]?(?:tools|commands|actions|ops)/i,
+  /permitted[_-]?(?:tools|commands|actions|ops)/i,
+];
+
+const DENYLIST_PATTERNS = [
+  /denylist/i, /blocklist/i, /blacklist/i,
+  /blocked[_-]?(?:tools|commands|actions|ops)/i,
+  /denied[_-]?(?:tools|commands|actions|ops)/i,
+  /restricted[_-]?(?:tools|commands|actions|ops)/i,
+];
+
+const CONFIRMATION_PATTERNS = [
+  /confirm(?:ation)?[_-]?(?:required|needed|prompt)/i,
+  /approve[_-]?(?:before|required|first)/i,
+  /dangerous[_-]?(?:ops?|operations?|commands?|tools?)/i,
+  /require[_-]?(?:confirmation|approval|consent)/i,
+  /human[_-]?(?:in[_-]?the[_-]?loop|approval|review)/i,
+  /confirm\s*[:=]\s*true/i,
+  /approval\s*[:=]\s*true/i,
+];
+
+export function analyzeToolPermissionBoundaries(content: string, filePath?: string): Finding[] {
+  const findings: Finding[] = [];
+
+  // Only analyze files that reference tools/skills
+  const hasToolRef = /(?:tool|skill|function|command|action|plugin)s?\b/i.test(content);
+  if (!hasToolRef) return findings;
+
+  const hasAllowlist = ALLOWLIST_PATTERNS.some(p => p.test(content));
+  const hasDenylist = DENYLIST_PATTERNS.some(p => p.test(content));
+  const hasConfirmation = CONFIRMATION_PATTERNS.some(p => p.test(content));
+
+  if (!hasAllowlist && !hasDenylist && !hasConfirmation) {
+    findings.push({
+      id: `PERM-TOOL-UNRESTRICTED-${filePath}`,
+      scanner: 'permission-analyzer',
+      severity: 'critical',
+      title: 'Tools have unrestricted access with no permission boundaries',
+      description: 'Tools have unrestricted access with no permission boundaries. Any user could potentially invoke any tool with arbitrary arguments. No allowlist, denylist, or confirmation mechanism detected.',
+      file: filePath,
+      recommendation: 'Define tool permission boundaries: add allowlists for permitted tools, denylists for dangerous operations, and require confirmation for high-risk tool invocations.',
+    });
+  } else if (hasAllowlist && hasConfirmation) {
+    // Good — has both allowlist AND confirmation for dangerous ops
+    // No finding needed
+  } else {
+    // Partial: has some restrictions but not comprehensive
+    const layers: string[] = [];
+    if (hasAllowlist) layers.push('allowlist');
+    if (hasDenylist) layers.push('denylist');
+    if (hasConfirmation) layers.push('confirmation');
+
+    findings.push({
+      id: `PERM-TOOL-PARTIAL-${filePath}`,
+      scanner: 'permission-analyzer',
+      severity: 'high',
+      title: 'Tools have partial permission boundaries',
+      description: `Tool permission restrictions detected (${layers.join(', ')}) but coverage is incomplete. Consider adding ${!hasAllowlist ? 'allowlist, ' : ''}${!hasDenylist ? 'denylist, ' : ''}${!hasConfirmation ? 'confirmation for dangerous operations, ' : ''}for defense-in-depth.`.replace(/, $/, '.'),
+      file: filePath,
+      recommendation: 'Strengthen tool permission boundaries: combine allowlists with confirmation prompts for dangerous operations. Apply the principle of least privilege.',
+    });
   }
 
   return findings;
