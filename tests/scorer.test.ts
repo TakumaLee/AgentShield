@@ -48,9 +48,9 @@ describe('Scorer', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings, scannedFiles: 1, duration: 50,
     }]);
-    // codeSafety=50, weighted: 50×0.4+100×0.3+100×0.3=80
-    expect(summary.score).toBe(80);
-    expect(summary.grade).toBe('B-');
+    // codeSafety=50 (F), floor cap: 50+10=60, weighted would be 80 but capped
+    expect(summary.score).toBe(60);
+    expect(summary.grade).toBe('D-');
   });
 
   test('F grade requires multiple severity types maxed out', () => {
@@ -63,9 +63,9 @@ describe('Scorer', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings: [...criticals, ...highs, ...mediums], scannedFiles: 1, duration: 50,
     }]);
-    // codeSafety≈2 (all penalties near max), weighted: ~2×0.4+100×0.3+100×0.3≈61
-    expect(summary.score).toBeLessThan(65);
-    expect(summary.score).toBeGreaterThanOrEqual(60);
+    // codeSafety≈2 (F), floor cap: 2+10=12, weighted would be ~61 but capped
+    expect(summary.score).toBeLessThanOrEqual(12);
+    expect(summary.score).toBeGreaterThanOrEqual(0);
   });
 
   test('scoreToGrade covers all ranges', () => {
@@ -201,9 +201,11 @@ describe('Confidence Weighting', () => {
     }];
     const summary = calculateSummary(results);
     const expectedPenalty = 20 * Math.log2(4.0 + 1);
-    const dimScore = Math.round(100 - expectedPenalty);
-    // weighted: dimScore×0.4+100×0.3+100×0.3
-    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
+    const dimScore = Math.round(100 - expectedPenalty); // ~54 (F)
+    // weighted would be ~82, but floor cap: 54+10=64
+    const weighted = Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3);
+    const floorCap = dimScore + 10;
+    expect(summary.score).toBe(Math.min(weighted, floorCap));
   });
 
   test('findings without confidence default to definite', () => {
@@ -312,9 +314,9 @@ describe('Three-Dimension Scoring', () => {
       },
     ];
     const summary = calculateSummary(results);
-    // Code safety is bad (50), config is perfect.
-    // Weighted avg: 50×0.4+100×0.3+100×0.3=80
-    expect(summary.score).toBe(80);
+    // Code safety is bad (50, F), config is perfect.
+    // Weighted would be 80, but floor cap: 50+10=60
+    expect(summary.score).toBe(60);
   });
 
   test('dimension grades are correctly assigned', () => {
@@ -401,9 +403,9 @@ describe('Edge Cases', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings, scannedFiles: 1, duration: 50,
     }]);
-    // codeSafety=0, weighted: 0×0.4+100×0.3+100×0.3=60
-    expect(summary.score).toBe(60);
-    expect(summary.grade).toBe('D-');
+    // codeSafety≈2 (F), floor cap: 2+10=12, weighted would be ~61 but capped
+    expect(summary.score).toBeLessThanOrEqual(12);
+    expect(summary.grade).toBe('F');
   });
 
   test('empty results array', () => {

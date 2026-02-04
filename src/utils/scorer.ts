@@ -165,7 +165,15 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
       dimensions.configSafety.score * DIMENSION_WEIGHTS.configSafety +
       dimensions.defenseScore.score * DIMENSION_WEIGHTS.defenseScore
     );
-    finalScore = weightedScore;
+
+    // Floor rule: if ANY dimension is F (<60), cap overall at that dimension's score + 10.
+    // Rationale: a catastrophic failure in one area (e.g., leaked API keys) shouldn't be
+    // rescued by good scores elsewhere. Security is only as strong as the weakest link.
+    const dimScores = [dimensions.codeSafety.score, dimensions.configSafety.score, dimensions.defenseScore.score];
+    const minDimScore = Math.min(...dimScores);
+    const floorCap = minDimScore < 60 ? minDimScore + 10 : Infinity;
+
+    finalScore = Math.min(weightedScore, floorCap);
     finalGrade = scoreToGrade(finalScore);
   }
 
