@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -15,6 +15,14 @@ export const promptInjectionTester: ScannerModule = {
       try {
         const content = readFileContent(file);
         const fileFindings = scanContent(content, file);
+        // Downgrade test/doc findings: critical→medium, high→info
+        if (isTestOrDocFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity === 'critical') f.severity = 'medium';
+            else if (f.severity === 'high') f.severity = 'info';
+            f.description += ' [test/doc file — severity reduced]';
+          }
+        }
         findings.push(...fileFindings);
       } catch {
         // Skip unreadable files

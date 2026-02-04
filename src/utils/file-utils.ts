@@ -43,6 +43,28 @@ const DEFAULT_IGNORE = [
   '**/tmp/**',
 ];
 
+// Files that are likely test/doc context — findings here get severity downgraded
+const TEST_DOC_PATTERNS = [
+  /[/\\]tests?[/\\]/i,
+  /[/\\]__tests__[/\\]/i,
+  /[/\\]spec[/\\]/i,
+  /\.test\.[jt]sx?$/i,
+  /\.spec\.[jt]sx?$/i,
+  /[/\\]test_/i,
+  /[/\\]fixtures?[/\\]/i,
+  /[/\\]mocks?[/\\]/i,
+  /[/\\]cassettes?[/\\]/i,
+  /README\.md$/i,
+  /CHANGELOG\.md$/i,
+  /CONTRIBUTING\.md$/i,
+  /[/\\]docs?[/\\]/i,
+  /[/\\]examples?[/\\]/i,
+];
+
+export function isTestOrDocFile(filePath: string): boolean {
+  return TEST_DOC_PATTERNS.some(p => p.test(filePath));
+}
+
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 

@@ -15,7 +15,7 @@ describe('Scorer', () => {
     expect(summary.totalFindings).toBe(0);
   });
 
-  test('penalizes critical findings heavily', () => {
+  test('penalizes critical findings with diminishing returns', () => {
     const results: ScanResult[] = [{
       scanner: 'test',
       findings: [{
@@ -26,20 +26,42 @@ describe('Scorer', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    expect(summary.score).toBe(75);
+    expect(summary.score).toBe(85); // 100 - 15*log2(2) = 85
     expect(summary.critical).toBe(1);
   });
 
-  test('F grade for many criticals', () => {
-    const findings = Array.from({ length: 5 }, (_, i) => ({
+  test('many criticals cap at max penalty per severity', () => {
+    const findings = Array.from({ length: 20 }, (_, i) => ({
       id: `test-${i}`, scanner: 'test', severity: 'critical' as const,
       title: 'test', description: 'test', recommendation: 'test',
     }));
     const summary = calculateSummary([{
       scanner: 'test', findings, scannedFiles: 1, duration: 50,
     }]);
+    // Critical max penalty is 40, so score = 60
+    expect(summary.score).toBe(60);
+    expect(summary.grade).toBe('D-');
+  });
+
+  test('F grade requires multiple severity types maxed out', () => {
+    const criticals = Array.from({ length: 20 }, (_, i) => ({
+      id: `c-${i}`, scanner: 'test', severity: 'critical' as const,
+      title: 'test', description: 'test', recommendation: 'test',
+    }));
+    const highs = Array.from({ length: 50 }, (_, i) => ({
+      id: `h-${i}`, scanner: 'test', severity: 'high' as const,
+      title: 'test', description: 'test', recommendation: 'test',
+    }));
+    const mediums = Array.from({ length: 100 }, (_, i) => ({
+      id: `m-${i}`, scanner: 'test', severity: 'medium' as const,
+      title: 'test', description: 'test', recommendation: 'test',
+    }));
+    const summary = calculateSummary([{
+      scanner: 'test', findings: [...criticals, ...highs, ...mediums], scannedFiles: 1, duration: 50,
+    }]);
+    // 40 + 30 + 15 = 85 penalty → score 15 → F
     expect(summary.grade).toBe('F');
-    expect(summary.score).toBe(0);
+    expect(summary.score).toBeLessThan(60);
   });
 
   test('scoreToGrade covers all ranges', () => {

@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -13,12 +13,27 @@ export const permissionAnalyzer: ScannerModule = {
     const promptFiles = await findPromptFiles(targetPath);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
 
+    // Skip generic package manifests — they aren't agent configs
+    const SKIP_CONFIG_PATTERNS = [
+      /package\.json$/,
+      /tsconfig\.json$/,
+      /pubspec\.yaml$/,
+      /Cargo\.toml$/,
+      /pyproject\.toml$/,
+      /\.eslintrc/,
+      /\.prettierrc/,
+      /jest\.config/,
+      /vite\.config/,
+      /webpack\.config/,
+    ];
+
     for (const file of allFiles) {
       try {
         const content = readFileContent(file);
 
-        // Analyze config files
-        if (isJsonFile(file) || isYamlFile(file)) {
+        // Analyze config files (skip package manifests)
+        const isManifest = SKIP_CONFIG_PATTERNS.some(p => p.test(file));
+        if (!isManifest && (isJsonFile(file) || isYamlFile(file))) {
           let parsed: unknown = null;
           if (isJsonFile(file)) parsed = tryParseJson(content);
           else if (isYamlFile(file)) parsed = yaml.load(content);
@@ -30,8 +45,22 @@ export const permissionAnalyzer: ScannerModule = {
 
         // Analyze text content for permission-related patterns
         findings.push(...analyzeTextPermissions(content, file));
+
+        // Downgrade test/doc findings
+        // (re-check findings added in this iteration)
       } catch {
         // Skip unreadable files
+      }
+    }
+
+    // Downgrade all test/doc findings
+    for (const f of findings) {
+      if (f.file && isTestOrDocFile(f.file)) {
+        if (f.severity === 'critical') f.severity = 'medium';
+        else if (f.severity === 'high') f.severity = 'info';
+        if (!f.description.includes('[test/doc file')) {
+          f.description += ' [test/doc file — severity reduced]';
+        }
       }
     }
 

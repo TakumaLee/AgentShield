@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
-import { findPromptFiles, readFileContent } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 
 export const secretLeakScanner: ScannerModule = {
@@ -14,9 +14,20 @@ export const secretLeakScanner: ScannerModule = {
     for (const file of files) {
       try {
         const content = readFileContent(file);
-        findings.push(...scanForSecrets(content, file));
-        findings.push(...scanForSensitivePaths(content, file));
-        findings.push(...scanForHardcodedCredentials(content, file));
+        const fileFindings = [
+          ...scanForSecrets(content, file),
+          ...scanForSensitivePaths(content, file),
+          ...scanForHardcodedCredentials(content, file),
+        ];
+        // Downgrade test/doc findings
+        if (isTestOrDocFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity === 'critical') f.severity = 'medium';
+            else if (f.severity === 'high') f.severity = 'info';
+            f.description += ' [test/doc file — severity reduced]';
+          }
+        }
+        findings.push(...fileFindings);
       } catch {
         // Skip unreadable files
       }
