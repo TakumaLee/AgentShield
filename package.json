@@ -24,10 +24,16 @@
     "ai",
     "agent",
     "security",
+    "audit",
     "mcp",
     "prompt-injection",
-    "audit",
-    "scanner"
+    "scanner",
+    "cli",
+    "devtool",
+    "llm",
+    "ai-safety",
+    "secret-detection",
+    "red-team"
   ],
   "author": "AgentShield Contributors",
   "license": "MIT",

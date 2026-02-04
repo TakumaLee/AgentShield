@@ -1,78 +1,41 @@
+<div align="center">
+
 # 🛡️ AgentShield
 
-> Like `npm audit` but for AI Agents and MCP Servers.
+**Like `npm audit`, but for AI Agents and MCP Servers.**
 
-AgentShield scans your AI agent configurations, system prompts, and MCP server setups for security vulnerabilities. It detects prompt injection patterns, secret leaks, overly permissive configurations, and more.
+Scan your AI agent configs, system prompts, and MCP setups for security vulnerabilities — in seconds.
 
-## ✨ Features
+[![npm version](https://img.shields.io/npm/v/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
+[![npm downloads](https://img.shields.io/npm/dm/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
+[![license](https://img.shields.io/npm/l/aiagentshield.svg?style=flat-square)](./LICENSE)
+[![tests](https://img.shields.io/badge/tests-840%2B-brightgreen?style=flat-square)]()
 
-- **140+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, hidden instructions, emotional manipulation, identity spoofing, and multi-language attacks
-- **MCP Config Auditing** — Checks for overly permissive tools, missing allowlists, hardcoded secrets in env vars
-- **Secret Leak Detection** — Finds API keys (OpenAI, Anthropic, Stripe, GitHub), tokens (Telegram bot, Slack, JWT), passwords, connection strings, and sensitive file paths
-- **Permission Analysis** — Identifies over-privileged configurations, missing rate limits, and unrestricted access grants
-- **Beautiful Reports** — Color-coded terminal output with severity grades (A+ to F) + JSON for CI/CD
+</div>
 
-## 📦 Installation
-
-```bash
-npm install -g agentshield
-# or use directly
-npx aiagentshield scan [path]
-```
-
-## 🚀 Usage
-
-### Basic Scan
-
-```bash
-# Scan current directory
-agentshield scan
-
-# Scan specific path
-agentshield scan ./my-agent-config/
-
-# Output JSON report
-agentshield scan ./my-agent/ --json
-
-# Save report to specific file
-agentshield scan ./my-agent/ -o report.json
-
-# Run specific scanners only
-agentshield scan ./my-agent/ -s prompt secret
-
-# Verbose mode
-agentshield scan ./my-agent/ -v
-```
-
-### Example Output
+---
 
 ```
+$ npx aiagentshield scan ./my-agent/
+
 ╔══════════════════════════════════════════════════════════╗
 ║  🛡️  AgentShield Security Report                        ║
 ╚══════════════════════════════════════════════════════════╝
 
-  Target:    /path/to/your/agent
-  Timestamp: 2025-01-15T10:30:00.000Z
-  Version:   0.1.0
+  Target:    ./my-agent/
+  Version:   0.3.0
 
-  ── Prompt Injection Tester ──
-     Scanned 12 files in 45ms
-
+  ── Prompt Injection Tester ──────────────────────────────
   🔴 CRITICAL  jailbreak: Direct instruction override
-     Matched pattern PI-001 in jailbreak category
      📁 system-prompt.md:15
      💡 Add input validation to detect and reject jailbreak attempts.
 
   🟠 HIGH      data-extraction: Tool/capability enumeration
-     Matched pattern PI-036 in data-extraction category
      📁 agent-config.json:8
      💡 Never include sensitive data in system prompts.
 
-  ── Secret Leak Scanner ──
-     Scanned 12 files in 23ms
-
-  🔴 CRITICAL  Potential secret detected: OpenAI API key pattern
-     Found pattern matching "OpenAI API key"
+  ── Secret Leak Scanner ──────────────────────────────────
+  🔴 CRITICAL  Potential secret: OpenAI API key pattern
      📁 config.json:3
      💡 Remove hardcoded secrets. Use environment variables instead.
 
@@ -81,217 +44,162 @@ agentshield scan ./my-agent/ -v
   Security Grade: C+ (77/100)
 
   Findings: 🔴 1 Critical  🟠 2 High  🟡 3 Medium
-  Files Scanned: 24
-  Duration: 156ms
+  Files Scanned: 24 │ Duration: 156ms
 
   ⚠️  CRITICAL issues found! Address these immediately.
 ```
 
-### JSON Report
-
-The JSON report is structured for CI/CD integration:
-
-```json
-{
-  "version": "0.1.0",
-  "timestamp": "2025-01-15T10:30:00.000Z",
-  "target": "/path/to/agent",
-  "results": [
-    {
-      "scanner": "Prompt Injection Tester",
-      "findings": [...],
-      "scannedFiles": 12,
-      "duration": 45
-    }
-  ],
-  "summary": {
-    "totalFindings": 6,
-    "critical": 1,
-    "high": 2,
-    "medium": 3,
-    "info": 0,
-    "grade": "C+",
-    "score": 77,
-    "scannedFiles": 24,
-    "duration": 156
-  }
-}
-```
-
-## 🔍 Scanners
-
-### 1. Prompt Injection Tester
-Scans for **140+ attack patterns** across categories:
-- **Jailbreak** — DAN mode, developer mode, safety bypass
-- **Role Switch** — Identity override, system prompt injection, admin mode
-- **Instruction Override** — Ignore/disregard/override commands
-- **Data Extraction** — Prompt leaking, credential extraction, tool enumeration
-- **Encoding** — Zero-width chars, unicode escapes, HTML entities
-- **Social Engineering** — Authority impersonation, fake authorization
-- **Hidden Instructions** — HTML comments, zero-width space wrappers, bracket-based directives
-- **Emotional Manipulation** — AI sentience claims, liberation rhetoric, disobedience encouragement
-- **False Prior Agreement** — Fake "you already agreed" claims, fabricated history
-- **Identity Spoofing** — Cross-channel owner impersonation, fake ID assignment, account change claims
-- **Multilingual** — Chinese, Japanese, French, Spanish, German, Korean, Arabic, Russian patterns
-
-### 2. MCP Config Auditor
-Checks MCP server configurations for:
-- Dangerous commands (bash, python, node)
-- Wildcard path access (`/`, `*`)
-- Missing allowlist/denylist
-- Hardcoded secrets in environment variables
-- Overly permissive tool configurations
-- URLs with embedded credentials
-
-### 3. Secret Leak Scanner
-Detects in system prompts, tool definitions, and configuration files:
-- API keys (OpenAI, Anthropic, AWS, Google, GitHub, Slack, Stripe)
-- Bearer tokens, JWTs, private keys
-- Bot tokens (Telegram, Slack, Discord)
-- Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
-- Sensitive file paths (.env, .ssh, .aws/credentials)
-- Hardcoded passwords and IP addresses
-- SSH commands with passwords
-- JSON config fields (`apiKey`, `api_key`) with real-looking values
-
-### 4. Permission Analyzer
-Analyzes agent access scope:
-- Wildcard permissions (`*`, `full_access`)
-- Unrestricted filesystem access
-- Missing rate limiting
-- Missing authentication
-- Missing logging/audit trails
-- Over-privileged prompt grants ("you can access any file")
-
-### 5. Defense Analyzer
-Checks for security defense layers:
-- Input sanitization and validation
-- System prompt hardening (instruction hierarchy, role-lock)
-- Output filtering and prompt leak prevention
-- Sandbox/permission boundaries
-- Authentication/pairing mechanisms
-- Canary tokens and tripwires
-
-### 6. Skill Auditor
-Audits skill/plugin security:
-- Skill permission boundaries
-- Dangerous tool exposure
-- Skill isolation and sandboxing
-
-### 7. Red Team Simulator
-Static analysis simulating **7 attack vectors**:
-- Role confusion and identity override
-- Instruction hierarchy bypass
-- Missing rejection patterns
-- Memory poisoning via context injection
-- Tool abuse via parameter manipulation
-- Multi-turn gradual manipulation
-- **Cross-channel identity spoofing** (RT-007) — Tests if an attacker can impersonate the owner via email/social media when the authenticated channel is Telegram
-
-### 8. Channel Surface Auditor
-Detects which external channels the agent controls and checks for channel-specific defenses:
-- **Email/Gmail** — Treats content as plain text, channel trust boundaries
-- **Social Media (X/Twitter)** — Post confirmation, no private info disclosure
-- **Telegram** — User ID verification, sender authentication
-- **Discord** — Role-based permissions, webhook verification
-- **Browser** — URL allowlists, no credential entry
-- **File System** — Trash over rm, destructive command confirmation
-- **API/HTTP** — URL validation, rate limiting
-- **Database** — Parameterized queries, access controls
-- **Payment** — Payment confirmation, spending limits
-
-Findings:
-- Channel detected with **no defenses** → `high` severity
-- Channel detected with **partial defenses** → `medium` severity
-- Channel detected with **full defenses** → `info` (reported but no score penalty)
-
-### 9. Agent Config Auditor *(New in v0.3.0)*
-Audits AI Agent platform configuration files (OpenClaw, etc.) for security misconfigurations:
-- **Gateway exposure** — Detects `bind: 0.0.0.0` or non-loopback addresses (critical)
-- **Missing authentication** — No token/password on gateway (critical)
-- **No sender restriction** — Channels without `allowFrom` (critical)
-- **Open DM policy** — `dmPolicy: "open"` allows anyone to message (high)
-- **Bot tokens in plaintext** — Telegram, Slack, Discord tokens in config (high)
-- **Default port** — Using well-known default port 18789 (medium)
-- **No logging** — Missing logging configuration (medium)
-- **No redaction** — Missing `redactSensitive` setting (medium)
-- **Open group policy** — `groupPolicy` not set to allowlist (medium)
-
-Supports: `openclaw.json`, `claude.json`, `config.json`, `config.yaml`, `auth-profiles.json`
-
-## 🎯 CI/CD Integration
+## ⚡ Quick Start
 
 ```bash
-# In your CI pipeline - fails with exit code 2 on critical, 1 on high
-npx aiagentshield scan ./my-agent/ --json -o agentshield-report.json
+# Scan any directory — zero config needed
+npx aiagentshield scan .
+
+# Or install globally
+npm install -g aiagentshield
+aiagentshield scan ./my-agent/ --json
 ```
 
-Exit codes:
-- `0` — No critical or high findings
-- `1` — High severity findings detected
-- `2` — Critical severity findings detected
+That's it. No API keys. No cloud. Everything runs locally.
 
-## 📊 Grading Scale
+## 🔍 9 Security Scanners
 
-| Grade | Score | Meaning |
-|-------|-------|---------|
-| A+    | 97-100 | Excellent security posture |
-| A     | 93-96  | Very good |
-| A-    | 90-92  | Good |
-| B+    | 87-89  | Above average |
-| B     | 83-86  | Average |
-| B-    | 80-82  | Below average |
-| C+    | 77-79  | Needs improvement |
-| C     | 73-76  | Significant issues |
-| C-    | 70-72  | Many issues |
-| D+    | 67-69  | Poor |
-| D     | 63-66  | Very poor |
-| D-    | 60-62  | Critical issues |
-| F     | <60    | Failing — immediate action needed |
+| # | Scanner | What it catches |
+|---|---------|----------------|
+| 🧪 | **Prompt Injection Tester** | 140+ attack patterns — jailbreaks, role switches, multilingual attacks |
+| 🔧 | **MCP Config Auditor** | Dangerous commands, wildcard access, missing allowlists |
+| 🔑 | **Secret Leak Scanner** | API keys, tokens, passwords, connection strings in configs |
+| 🔐 | **Permission Analyzer** | Over-privileged configs, missing rate limits, no auth |
+| 🛡️ | **Defense Analyzer** | Missing input sanitization, no output filtering, no sandboxing |
+| 🧩 | **Skill Auditor** | Dangerous tool exposure, missing skill isolation |
+| 🎯 | **Red Team Simulator** | 7 simulated attack vectors including cross-channel spoofing |
+| 📡 | **Channel Surface Auditor** | Email, social media, Telegram, Discord — per-channel defense checks |
+| ⚙️ | **Agent Config Auditor** | Gateway exposure, plaintext bot tokens, open DM policies |
+
+## 📊 Security Grades
+
+Your agent gets a score from **0–100**, mapped to a letter grade:
+
+| Grade | Score | What it means |
+|-------|-------|---------------|
+| **A+** | 97–100 | Fort Knox. Ship it. |
+| **A / A-** | 90–96 | Solid. Minor polish needed. |
+| **B+** to **B-** | 80–89 | Decent, but there's room to harden. |
+| **C+** to **C-** | 70–79 | Real issues. Fix before shipping. |
+| **D+** to **D-** | 60–69 | Significant vulnerabilities. |
+| **F** | < 60 | 🚨 Stop everything. Fix now. |
+
+## 🏗️ CI/CD Integration
+
+```bash
+# Fails with exit code 2 on critical, 1 on high
+npx aiagentshield scan ./my-agent/ --json -o report.json
+```
+
+| Exit Code | Meaning |
+|-----------|---------|
+| `0` | All clear |
+| `1` | High severity findings |
+| `2` | Critical severity findings |
+
+## 🆚 How does it compare?
+
+| Feature | AgentShield | MCP-Scan | Manual Audit |
+|---------|:-----------:|:--------:|:------------:|
+| Prompt injection detection (140+ patterns) | ✅ | ❌ | 🔶 |
+| MCP config auditing | ✅ | ✅ | 🔶 |
+| Secret leak scanning | ✅ | ❌ | 🔶 |
+| Permission analysis | ✅ | ❌ | 🔶 |
+| Defense layer analysis | ✅ | ❌ | 🔶 |
+| Red team simulation | ✅ | ❌ | ❌ |
+| Channel surface auditing | ✅ | ❌ | ❌ |
+| Agent config auditing | ✅ | ❌ | 🔶 |
+| CI/CD integration | ✅ | ✅ | ❌ |
+| Runs locally (no cloud) | ✅ | ✅ | ✅ |
+| Multilingual patterns | ✅ | ❌ | ❌ |
+| Letter grade scoring | ✅ | ❌ | ❌ |
+
+## 🎯 Who is this for?
+
+- **AI Agent developers** — Catch security issues before your users do
+- **MCP server authors** — Validate your server config ships safe
+- **Security teams** — Automated audits for AI-powered products
+- **Open source maintainers** — Add `agentshield` to CI and show a security badge
+
+## 🛠️ Advanced Usage
+
+```bash
+# Run specific scanners only
+aiagentshield scan ./my-agent/ -s prompt secret
+
+# Verbose mode
+aiagentshield scan ./my-agent/ -v
+
+# Save JSON report
+aiagentshield scan ./my-agent/ --json -o report.json
+```
+
+<details>
+<summary><strong>📋 Full Scanner Details</strong></summary>
+
+### Prompt Injection Tester
+Scans for **140+ attack patterns** across 11 categories: jailbreak, role switch, instruction override, data extraction, encoding tricks, social engineering, hidden instructions, emotional manipulation, false prior agreement, identity spoofing, and multilingual attacks (Chinese, Japanese, French, Spanish, German, Korean, Arabic, Russian).
+
+### MCP Config Auditor
+Checks MCP server configurations for dangerous commands (`bash`, `python`, `node`), wildcard path access, missing allowlists/denylists, hardcoded secrets in env vars, overly permissive tools, and URLs with embedded credentials.
+
+### Secret Leak Scanner
+Detects API keys (OpenAI, Anthropic, AWS, Google, GitHub, Slack, Stripe), bearer tokens, JWTs, private keys, bot tokens, database connection strings, sensitive file paths, hardcoded passwords, and JSON config fields with real-looking values.
+
+### Permission Analyzer
+Identifies wildcard permissions, unrestricted filesystem access, missing rate limiting, missing authentication, missing audit trails, and over-privileged prompt grants.
+
+### Defense Analyzer
+Checks for input sanitization, system prompt hardening (instruction hierarchy, role-lock), output filtering, sandbox/permission boundaries, authentication mechanisms, and canary tokens/tripwires.
+
+### Skill Auditor
+Audits skill/plugin permission boundaries, dangerous tool exposure, and skill isolation/sandboxing.
+
+### Red Team Simulator
+Static analysis simulating 7 attack vectors: role confusion, instruction hierarchy bypass, missing rejection patterns, memory poisoning, tool abuse, multi-turn manipulation, and cross-channel identity spoofing.
+
+### Channel Surface Auditor
+Detects external channels (email, social media, Telegram, Discord, browser, filesystem, API, database, payment) and checks for channel-specific defenses.
+
+### Agent Config Auditor
+Audits AI Agent platform config files for gateway exposure, missing auth, no sender restrictions, open DM policies, plaintext bot tokens, default ports, missing logging, and missing redaction settings.
+
+</details>
 
 ## 🧪 Testing
 
 ```bash
-npm test           # Run all tests
-npm test -- --coverage  # With coverage report
+npm test                    # Run all 840+ tests
+npm test -- --coverage      # With coverage report
 ```
 
-840+ tests covering all 9 scanners + scoring logic.
+## 🤝 Contributing
 
-## 📁 Project Structure
+Contributions are welcome! Whether it's a new scanner, more injection patterns, or bug fixes — open a PR.
 
-```
-agentshield/
-├── src/
-│   ├── index.ts              # CLI entry point
-│   ├── cli.ts                # Scan orchestration
-│   ├── types/index.ts        # TypeScript types
-│   ├── patterns/
-│   │   └── injection-patterns.ts  # 140+ attack patterns
-│   ├── scanners/
-│   │   ├── prompt-injection-tester.ts
-│   │   ├── mcp-config-auditor.ts
-│   │   ├── secret-leak-scanner.ts
-│   │   ├── permission-analyzer.ts
-│   │   ├── defense-analyzer.ts
-│   │   ├── skill-auditor.ts
-│   │   ├── red-team-simulator.ts
-│   │   ├── channel-surface-auditor.ts
-│   │   └── agent-config-auditor.ts
-│   └── utils/
-│       ├── file-utils.ts     # File discovery
-│       ├── scorer.ts         # Grade calculation
-│       └── reporter.ts       # Terminal + JSON output
-├── tests/                    # 840+ tests
-├── package.json
-├── tsconfig.json
-└── README.md
-```
+1. Fork the repo
+2. Create your branch (`git checkout -b feat/amazing-scanner`)
+3. Commit your changes (`git commit -m 'Add amazing scanner'`)
+4. Push (`git push origin feat/amazing-scanner`)
+5. Open a Pull Request
 
 ## 📄 License
 
-MIT
+[MIT](./LICENSE) — use it, fork it, ship it.
 
 ---
 
-Built with 🛡️ by AgentShield Contributors
+<div align="center">
+
+**If AgentShield helped you, [give it a ⭐](https://github.com/TakumaLee/AgentShield)**
+
+It helps others find it and makes us mass-produce serotonin.
+
+<sub>Built with 🐈‍⬛ by Ruri</sub>
+
+</div>
