@@ -137,21 +137,41 @@ export function isAgentShieldTestFile(filePath: string): boolean {
 }
 
 /**
- * Check if a file is part of AgentShield's own source code (src/).
+ * Check if a file is part of AgentShield's own source code or project files.
  * Scanner source files contain pattern definitions (e.g. regex for ../../,
  * /etc/passwd, chmod 777) that are detection rules, not vulnerabilities.
  * Findings here should be downgraded to info.
  */
 export function isAgentShieldSourceFile(filePath: string): boolean {
-  // Use __dirname to anchor to THIS installation's source files,
-  // not any random project with "agentshield" in its path
-  const agentShieldRoot = require('path').resolve(__dirname, '..');
+  // __dirname is dist/utils/ when compiled, so go up 2 levels to reach project root
+  const agentShieldRoot = require('path').resolve(__dirname, '..', '..');
   const resolved = require('path').resolve(filePath);
-  if (resolved.startsWith(agentShieldRoot)) return true;
+
+  if (resolved.startsWith(agentShieldRoot)) {
+    // Only downgrade files in src/, memory/, patterns/ — not test temp dirs or arbitrary files
+    const relative = resolved.slice(agentShieldRoot.length);
+    if (/^[/\\](?:src|memory|patterns)[/\\]/i.test(relative)) return true;
+    // Also match root-level project files like README.md, AGENTS.md
+    if (/^[/\\][A-Z]+\.md$/i.test(relative)) return true;
+  }
+
   // Fallback: also match when running from source (not compiled)
   return /agentshield[/\\]src[/\\]/i.test(filePath) &&
-         filePath.includes('agentshield') &&
-         (filePath.includes('node_modules') || filePath.includes(require('path').basename(agentShieldRoot)));
+         filePath.includes('agentshield');
+}
+
+/**
+ * Check if the scan target itself IS the AgentShield project.
+ * Used for broad self-scan protection.
+ */
+export function isAgentShieldProject(targetPath: string): boolean {
+  const pkgPath = require('path').join(targetPath, 'package.json');
+  try {
+    const pkg = JSON.parse(require('fs').readFileSync(pkgPath, 'utf-8'));
+    return pkg.name === 'aiagentshield';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -338,6 +358,32 @@ export function hasAuthFiles(files: string[]): boolean {
     /[/\\]oauth/i,
   ];
   return files.some(f => AUTH_FILE_PATTERNS.some(p => p.test(f)));
+}
+
+/**
+ * Check if a file is a Markdown file (.md).
+ * Markdown files discussing attack techniques should be downgraded
+ * (critical→medium, high→info) since they are documentation, not attacks.
+ */
+export function isMarkdownFile(filePath: string): boolean {
+  return /\.md$/i.test(filePath);
+}
+
+/**
+ * Check if a line is inside a code comment or markdown code block context.
+ * Looks for common single-line comment prefixes: //, #, *, or markdown ``` blocks.
+ */
+export function isInCommentOrCodeBlock(line: string): boolean {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('#') ||
+    trimmed.startsWith('*') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('```') ||
+    trimmed.startsWith('- `') ||
+    trimmed.startsWith('| ')
+  );
 }
 
 export function isJsonFile(filePath: string): boolean {

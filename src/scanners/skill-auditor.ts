@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile, isMarkdownFile } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;

@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile } from '../utils/file-utils';
 
 interface DefenseCategory {
   id: string;
@@ -452,8 +452,10 @@ export const defenseAnalyzer: ScannerModule = {
 
         // Check for sensitive data in prompt-like files
         // Skip AgentShield's own test/source files — they contain pattern
-        // definitions and test samples, not real secrets
-        if (!isAgentShieldTestFile(file) && !isAgentShieldSourceFile(file)) {
+        // definitions and test samples, not real secrets.
+        // Also skip markdown files — they discuss security techniques
+        // in documentation context, not expose real secrets.
+        if (!isAgentShieldTestFile(file) && !isAgentShieldSourceFile(file) && !isMarkdownFile(file)) {
           const sensitiveHits = analyzeSensitiveDataInPrompt(content, file);
           promptLeakAnalysis.sensitiveDataFound.push(...sensitiveHits);
         }

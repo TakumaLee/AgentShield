@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -42,6 +42,13 @@ export const promptInjectionTester: ScannerModule = {
               f.severity = 'info';
               f.description += ' [AgentShield source file — pattern definition, not an attack]';
             }
+          }
+        } else if (isMarkdownFile(file)) {
+          // Markdown files discussing attack techniques are documentation, not attacks
+          for (const f of fileFindings) {
+            if (f.severity === 'critical') f.severity = 'medium';
+            else if (f.severity === 'high') f.severity = 'info';
+            f.description += ' [markdown file — technical discussion, not an attack]';
           }
         } else if (isTestOrDocFile(file)) {
           // Downgrade test/doc findings: critical→medium, high→info

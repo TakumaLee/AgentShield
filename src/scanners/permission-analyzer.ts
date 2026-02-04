@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isAgentShieldSourceFile, isMarkdownFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -165,6 +165,15 @@ export const permissionAnalyzer: ScannerModule = {
           f.severity = 'info';
           f.description += ' [Framework context: partial boundaries detected in framework code; full configuration is delegated to end users.]';
         }
+      }
+    }
+
+    // Downgrade markdown file findings (technical discussions, not attacks)
+    for (const f of findings) {
+      if (f.file && isMarkdownFile(f.file) && !f.description.includes('[markdown')) {
+        if (f.severity === 'critical') f.severity = 'medium';
+        else if (f.severity === 'high') f.severity = 'info';
+        f.description += ' [markdown file — technical discussion, severity reduced]';
       }
     }
 

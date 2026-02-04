@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isInCommentOrCodeBlock } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 
 export const secretLeakScanner: ScannerModule = {
@@ -45,6 +45,13 @@ export const secretLeakScanner: ScannerModule = {
               f.severity = 'info';
               f.description += ' [AgentShield source file — pattern definition, not a real secret]';
             }
+          }
+        } else if (isMarkdownFile(file)) {
+          // Markdown files discussing security topics are documentation
+          for (const f of fileFindings) {
+            if (f.severity === 'critical') f.severity = 'medium';
+            else if (f.severity === 'high') f.severity = 'info';
+            f.description += ' [markdown file — technical discussion, not a real secret]';
           }
         } else if (isTestOrDocFile(file)) {
           // Downgrade test/doc findings
@@ -127,6 +134,13 @@ export function scanForSensitivePaths(content: string, filePath?: string): Findi
         // For SP-003 (.env): downgrade prose mentions to info
         let severity: 'critical' | 'high' | 'medium' | 'info' = 'high';
         let note = '';
+
+        // Sensitive paths (e.g. /etc/passwd) in comments or markdown code blocks
+        // are documentation/examples, not actual vulnerabilities
+        if (isInCommentOrCodeBlock(lines[i])) {
+          severity = 'info';
+          note = ' [in comment/code block — example reference, not a vulnerability]';
+        }
         if (pathPattern.id === 'SP-003') {
           // Check if this is a prose/doc mention vs actual file reference
           const line = lines[i];
