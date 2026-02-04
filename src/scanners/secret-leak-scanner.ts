@@ -57,7 +57,10 @@ export function scanForSecrets(content: string, filePath?: string): Finding[] {
         let severity: 'critical' | 'high' | 'medium' | 'info' = 'critical';
         let note = '';
 
-        if (isDevCredential(lines[i])) {
+        if (filePath && isPlatformConfigFile(filePath) && PLATFORM_SAFE_SECRET_IDS.has(secret.id)) {
+          severity = 'info';
+          note = ` [${PLATFORM_CONFIG_NOTE}]`;
+        } else if (isDevCredential(lines[i])) {
           severity = 'medium';
           note = ' [common dev value — likely not a real secret]';
         } else if (filePath && isExampleFile(filePath)) {
@@ -193,6 +196,28 @@ const EXAMPLE_FILE_PATTERNS = [
 
 function isExampleFile(filePath: string): boolean {
   return EXAMPLE_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
+// Platform config files where API keys/client IDs are expected and restricted by package/bundle signing
+const PLATFORM_CONFIG_PATTERNS = [
+  /google-services\.json$/i,
+  /GoogleService-Info\.plist$/i,
+  /AndroidManifest\.xml$/i,
+  /\.xcconfig$/i,
+  /Info\.plist$/i,
+];
+
+const PLATFORM_CONFIG_NOTE = 'Platform config file — API identifiers are typically safe when restricted by package/bundle signing. Verify restrictions on Google Cloud Console.';
+
+// Secret patterns that are expected in platform config files (API keys, OAuth client IDs)
+const PLATFORM_SAFE_SECRET_IDS = new Set([
+  'SL-001', // API key assignment
+  'SL-013', // Google API key (AIza...)
+  'SL-014', // Google OAuth client ID
+]);
+
+function isPlatformConfigFile(filePath: string): boolean {
+  return PLATFORM_CONFIG_PATTERNS.some(p => p.test(filePath));
 }
 
 function isDevCredential(line: string): boolean {

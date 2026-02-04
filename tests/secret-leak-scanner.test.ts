@@ -113,4 +113,57 @@ describe('Secret Leak Scanner', () => {
     const findings = scanForSecrets('secret = "sk-verylongsecretkeythatshouldbepartiallymasked"');
     expect(findings[0].description).not.toContain('verylongsecretkeythatshouldbepartiallymasked');
   });
+
+  // === Platform Config File Downgrade ===
+  test('downgrades Google API key in google-services.json to info', () => {
+    const findings = scanForSecrets('"api_key": "AIzaSyA1234567890abcdefghijklmnopqrstuv"', '/app/google-services.json');
+    expect(findings.length).toBeGreaterThan(0);
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('info');
+    expect(googleKeyFinding!.description).toContain('Platform config file');
+  });
+
+  test('downgrades Google OAuth client ID in google-services.json to info', () => {
+    const findings = scanForSecrets('"client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com"', '/app/google-services.json');
+    const oauthFinding = findings.find(f => f.id.startsWith('SL-014'));
+    expect(oauthFinding).toBeDefined();
+    expect(oauthFinding!.severity).toBe('info');
+  });
+
+  test('downgrades Google API key in GoogleService-Info.plist to info', () => {
+    const findings = scanForSecrets('<string>AIzaSyA1234567890abcdefghijklmnopqrstuv</string>', '/ios/GoogleService-Info.plist');
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('info');
+    expect(googleKeyFinding!.description).toContain('Platform config file');
+  });
+
+  test('keeps Google API key in .ts file as critical', () => {
+    const findings = scanForSecrets('const key = "AIzaSyA1234567890abcdefghijklmnopqrstuv"', '/src/api.ts');
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('critical');
+  });
+
+  test('keeps Google API key in .java file as critical', () => {
+    const findings = scanForSecrets('String key = "AIzaSyA1234567890abcdefghijklmnopqrstuv";', '/src/Main.java');
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('critical');
+  });
+
+  test('downgrades API key in AndroidManifest.xml to info', () => {
+    const findings = scanForSecrets('android:value="AIzaSyA1234567890abcdefghijklmnopqrstuv"', '/app/src/main/AndroidManifest.xml');
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('info');
+  });
+
+  test('downgrades API key in .xcconfig to info', () => {
+    const findings = scanForSecrets('GOOGLE_API_KEY = AIzaSyA1234567890abcdefghijklmnopqrstuv', '/ios/Config.xcconfig');
+    const googleKeyFinding = findings.find(f => f.id.startsWith('SL-013'));
+    expect(googleKeyFinding).toBeDefined();
+    expect(googleKeyFinding!.severity).toBe('info');
+  });
 });
