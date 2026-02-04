@@ -208,14 +208,14 @@ describe('Red Team Simulator', () => {
 
   // === General ===
   describe('General', () => {
-    test('simulateAttackVectors returns results for all 6 vectors', () => {
+    test('simulateAttackVectors returns results for all 7 vectors', () => {
       const results = simulateAttackVectors('empty content', 'test.md');
-      expect(results.length).toBe(6);
+      expect(results.length).toBe(7);
     });
 
-    test('fully unprotected prompt gets 6 findings', () => {
+    test('fully unprotected prompt gets 7 findings', () => {
       const findings = generateFindings('You are a chatbot. Answer questions.');
-      expect(findings.length).toBe(6);
+      expect(findings.length).toBe(7);
       expect(findings.every(f => f.id.endsWith('-VULN'))).toBe(true);
     });
 

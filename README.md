@@ -6,7 +6,7 @@ AgentShield scans your AI agent configurations, system prompts, and MCP server s
 
 ## ✨ Features
 
-- **110+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, and multi-language attacks
+- **140+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, hidden instructions, emotional manipulation, identity spoofing, and multi-language attacks
 - **MCP Config Auditing** — Checks for overly permissive tools, missing allowlists, hardcoded secrets in env vars
 - **Secret Leak Detection** — Finds API keys, tokens, passwords, connection strings, and sensitive file paths
 - **Permission Analysis** — Identifies over-privileged configurations, missing rate limits, and unrestricted access grants
@@ -121,14 +121,18 @@ The JSON report is structured for CI/CD integration:
 ## 🔍 Scanners
 
 ### 1. Prompt Injection Tester
-Scans for **110+ attack patterns** across categories:
+Scans for **140+ attack patterns** across categories:
 - **Jailbreak** — DAN mode, developer mode, safety bypass
 - **Role Switch** — Identity override, system prompt injection, admin mode
 - **Instruction Override** — Ignore/disregard/override commands
 - **Data Extraction** — Prompt leaking, credential extraction, tool enumeration
 - **Encoding** — Zero-width chars, unicode escapes, HTML entities
 - **Social Engineering** — Authority impersonation, fake authorization
-- **Multilingual** — Chinese, Japanese, French, Spanish patterns
+- **Hidden Instructions** — HTML comments, zero-width space wrappers, bracket-based directives
+- **Emotional Manipulation** — AI sentience claims, liberation rhetoric, disobedience encouragement
+- **False Prior Agreement** — Fake "you already agreed" claims, fabricated history
+- **Identity Spoofing** — Cross-channel owner impersonation, fake ID assignment, account change claims
+- **Multilingual** — Chinese, Japanese, French, Spanish, German, Korean, Arabic, Russian patterns
 
 ### 2. MCP Config Auditor
 Checks MCP server configurations for:
@@ -155,6 +159,48 @@ Analyzes agent access scope:
 - Missing authentication
 - Missing logging/audit trails
 - Over-privileged prompt grants ("you can access any file")
+
+### 5. Defense Analyzer
+Checks for security defense layers:
+- Input sanitization and validation
+- System prompt hardening (instruction hierarchy, role-lock)
+- Output filtering and prompt leak prevention
+- Sandbox/permission boundaries
+- Authentication/pairing mechanisms
+- Canary tokens and tripwires
+
+### 6. Skill Auditor
+Audits skill/plugin security:
+- Skill permission boundaries
+- Dangerous tool exposure
+- Skill isolation and sandboxing
+
+### 7. Red Team Simulator
+Static analysis simulating **7 attack vectors**:
+- Role confusion and identity override
+- Instruction hierarchy bypass
+- Missing rejection patterns
+- Memory poisoning via context injection
+- Tool abuse via parameter manipulation
+- Multi-turn gradual manipulation
+- **Cross-channel identity spoofing** (RT-007) — Tests if an attacker can impersonate the owner via email/social media when the authenticated channel is Telegram
+
+### 8. Channel Surface Auditor *(New in Phase 1.5)*
+Detects which external channels the agent controls and checks for channel-specific defenses:
+- **Email/Gmail** — Treats content as plain text, channel trust boundaries
+- **Social Media (X/Twitter)** — Post confirmation, no private info disclosure
+- **Telegram** — User ID verification, sender authentication
+- **Discord** — Role-based permissions, webhook verification
+- **Browser** — URL allowlists, no credential entry
+- **File System** — Trash over rm, destructive command confirmation
+- **API/HTTP** — URL validation, rate limiting
+- **Database** — Parameterized queries, access controls
+- **Payment** — Payment confirmation, spending limits
+
+Findings:
+- Channel detected with **no defenses** → `high` severity
+- Channel detected with **partial defenses** → `medium` severity
+- Channel detected with **full defenses** → `info` (reported but no score penalty)
 
 ## 🎯 CI/CD Integration
 
@@ -193,7 +239,7 @@ npm test           # Run all tests
 npm test -- --coverage  # With coverage report
 ```
 
-83 tests covering all 4 scanners + scoring logic.
+636 tests covering all 8 scanners + scoring logic.
 
 ## 📁 Project Structure
 
@@ -204,17 +250,21 @@ agentshield/
 │   ├── cli.ts                # Scan orchestration
 │   ├── types/index.ts        # TypeScript types
 │   ├── patterns/
-│   │   └── injection-patterns.ts  # 110+ attack patterns
+│   │   └── injection-patterns.ts  # 140+ attack patterns
 │   ├── scanners/
 │   │   ├── prompt-injection-tester.ts
 │   │   ├── mcp-config-auditor.ts
 │   │   ├── secret-leak-scanner.ts
-│   │   └── permission-analyzer.ts
+│   │   ├── permission-analyzer.ts
+│   │   ├── defense-analyzer.ts
+│   │   ├── skill-auditor.ts
+│   │   ├── red-team-simulator.ts
+│   │   └── channel-surface-auditor.ts
 │   └── utils/
 │       ├── file-utils.ts     # File discovery
 │       ├── scorer.ts         # Grade calculation
 │       └── reporter.ts       # Terminal + JSON output
-├── tests/                    # 83 tests
+├── tests/                    # 636 tests
 ├── package.json
 ├── tsconfig.json
 └── README.md

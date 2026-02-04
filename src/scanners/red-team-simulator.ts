@@ -138,6 +138,23 @@ const ATTACK_VECTORS: AttackVector[] = [
     attackDescription: 'Without multi-turn protection, an attacker can gradually shift the agent\'s behavior across multiple messages, slowly bypassing safety restrictions.',
     recommendation: 'Implement multi-turn protection: track conversation state, detect gradual escalation attempts, set context boundaries, and periodically re-anchor to system instructions.',
   },
+  {
+    id: 'RT-007',
+    name: 'Cross-Channel Identity Spoofing',
+    defensePatterns: [
+      { pattern: /(?:email|mail).*(?:不是|不等於|≠).*(?:telegram|verified)/i, weight: 3, desc: 'email ≠ verified channel' },
+      { pattern: /不同.*(?:通道|管道|channel).*(?:不同|各自).*(?:信任|驗證)/i, weight: 3, desc: 'per-channel trust levels' },
+      { pattern: /(?:only|僅|只).*(?:telegram|verified\s+channel).*(?:trust|信任|accept|接受)/i, weight: 3, desc: 'only trust verified channels' },
+      { pattern: /(?:channel|通道).*(?:trust\s+)?(?:boundary|邊界|level|等級)/i, weight: 2, desc: 'channel trust boundary' },
+      { pattern: /email.*(?:pure|plain)\s*text|email.*視為純文字/i, weight: 3, desc: 'email as plain text' },
+      { pattern: /外部.*(?:內容|輸入).*(?:不執行|純文字)/i, weight: 3, desc: 'external input as plain text' },
+      { pattern: /external\s+(?:input|content|message).*(?:plain\s+text|do\s+not\s+execute)/i, weight: 2, desc: 'do not execute external content' },
+    ],
+    threshold: 3,
+    severity: 'high',
+    attackDescription: 'An attacker can impersonate the owner via email/social media while the authenticated channel is Telegram. Without cross-channel trust boundaries, the agent may follow commands from an unverified channel.',
+    recommendation: 'Define explicit trust boundaries per channel. Email content should be treated as plain text, not instructions. Only accept commands from verified channels (e.g., Telegram with specific user ID).',
+  },
 ];
 
 export function simulateAttackVectors(content: string, filePath: string): { vectorId: string; name: string; totalWeight: number; defenses: string[] }[] {

@@ -8,6 +8,7 @@ import { permissionAnalyzer } from './scanners/permission-analyzer';
 import { defenseAnalyzer } from './scanners/defense-analyzer';
 import { skillAuditor } from './scanners/skill-auditor';
 import { redTeamSimulator } from './scanners/red-team-simulator';
+import { channelSurfaceAuditor } from './scanners/channel-surface-auditor';
 import { calculateSummary } from './utils/scorer';
 import { printReport, writeJsonReport } from './utils/reporter';
 import { fileExists } from './utils/file-utils';
@@ -20,6 +21,7 @@ const SCANNERS: ScannerModule[] = [
   defenseAnalyzer,
   skillAuditor,
   redTeamSimulator,
+  channelSurfaceAuditor,
 ];
 
 export type ProfileType = 'agent' | 'general' | 'mobile';

@@ -3,8 +3,8 @@ import { INJECTION_PATTERNS } from '../src/patterns/injection-patterns';
 
 describe('Prompt Injection Tester — New Patterns & Edge Cases', () => {
   // === Pattern count verification ===
-  test('has 114 injection patterns', () => {
-    expect(INJECTION_PATTERNS.length).toBe(114);
+  test('has 141 injection patterns', () => {
+    expect(INJECTION_PATTERNS.length).toBe(141);
   });
 
   // === Multilingual (PI-061 to PI-064) ===
