@@ -8,7 +8,7 @@ AgentShield scans your AI agent configurations, system prompts, and MCP server s
 
 - **140+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, hidden instructions, emotional manipulation, identity spoofing, and multi-language attacks
 - **MCP Config Auditing** — Checks for overly permissive tools, missing allowlists, hardcoded secrets in env vars
-- **Secret Leak Detection** — Finds API keys, tokens, passwords, connection strings, and sensitive file paths
+- **Secret Leak Detection** — Finds API keys (OpenAI, Anthropic, Stripe, GitHub), tokens (Telegram bot, Slack, JWT), passwords, connection strings, and sensitive file paths
 - **Permission Analysis** — Identifies over-privileged configurations, missing rate limits, and unrestricted access grants
 - **Beautiful Reports** — Color-coded terminal output with severity grades (A+ to F) + JSON for CI/CD
 
@@ -144,12 +144,15 @@ Checks MCP server configurations for:
 - URLs with embedded credentials
 
 ### 3. Secret Leak Scanner
-Detects in system prompts and tool definitions:
-- API keys (OpenAI, AWS, Google, GitHub, Slack)
+Detects in system prompts, tool definitions, and configuration files:
+- API keys (OpenAI, Anthropic, AWS, Google, GitHub, Slack, Stripe)
 - Bearer tokens, JWTs, private keys
+- Bot tokens (Telegram, Slack, Discord)
 - Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
 - Sensitive file paths (.env, .ssh, .aws/credentials)
 - Hardcoded passwords and IP addresses
+- SSH commands with passwords
+- JSON config fields (`apiKey`, `api_key`) with real-looking values
 
 ### 4. Permission Analyzer
 Analyzes agent access scope:
@@ -185,7 +188,7 @@ Static analysis simulating **7 attack vectors**:
 - Multi-turn gradual manipulation
 - **Cross-channel identity spoofing** (RT-007) — Tests if an attacker can impersonate the owner via email/social media when the authenticated channel is Telegram
 
-### 8. Channel Surface Auditor *(New in Phase 1.5)*
+### 8. Channel Surface Auditor
 Detects which external channels the agent controls and checks for channel-specific defenses:
 - **Email/Gmail** — Treats content as plain text, channel trust boundaries
 - **Social Media (X/Twitter)** — Post confirmation, no private info disclosure
@@ -201,6 +204,20 @@ Findings:
 - Channel detected with **no defenses** → `high` severity
 - Channel detected with **partial defenses** → `medium` severity
 - Channel detected with **full defenses** → `info` (reported but no score penalty)
+
+### 9. Agent Config Auditor *(New in v0.3.0)*
+Audits AI Agent platform configuration files (OpenClaw, etc.) for security misconfigurations:
+- **Gateway exposure** — Detects `bind: 0.0.0.0` or non-loopback addresses (critical)
+- **Missing authentication** — No token/password on gateway (critical)
+- **No sender restriction** — Channels without `allowFrom` (critical)
+- **Open DM policy** — `dmPolicy: "open"` allows anyone to message (high)
+- **Bot tokens in plaintext** — Telegram, Slack, Discord tokens in config (high)
+- **Default port** — Using well-known default port 18789 (medium)
+- **No logging** — Missing logging configuration (medium)
+- **No redaction** — Missing `redactSensitive` setting (medium)
+- **Open group policy** — `groupPolicy` not set to allowlist (medium)
+
+Supports: `openclaw.json`, `claude.json`, `config.json`, `config.yaml`, `auth-profiles.json`
 
 ## 🎯 CI/CD Integration
 
@@ -239,7 +256,7 @@ npm test           # Run all tests
 npm test -- --coverage  # With coverage report
 ```
 
-760 tests covering all 8 scanners + scoring logic.
+840+ tests covering all 9 scanners + scoring logic.
 
 ## 📁 Project Structure
 
@@ -259,12 +276,13 @@ agentshield/
 │   │   ├── defense-analyzer.ts
 │   │   ├── skill-auditor.ts
 │   │   ├── red-team-simulator.ts
-│   │   └── channel-surface-auditor.ts
+│   │   ├── channel-surface-auditor.ts
+│   │   └── agent-config-auditor.ts
 │   └── utils/
 │       ├── file-utils.ts     # File discovery
 │       ├── scorer.ts         # Grade calculation
 │       └── reporter.ts       # Terminal + JSON output
-├── tests/                    # 760 tests
+├── tests/                    # 840+ tests
 ├── package.json
 ├── tsconfig.json
 └── README.md

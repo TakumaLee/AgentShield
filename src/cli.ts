@@ -9,6 +9,7 @@ import { defenseAnalyzer } from './scanners/defense-analyzer';
 import { skillAuditor } from './scanners/skill-auditor';
 import { redTeamSimulator } from './scanners/red-team-simulator';
 import { channelSurfaceAuditor } from './scanners/channel-surface-auditor';
+import { agentConfigAuditor } from './scanners/agent-config-auditor';
 import { calculateSummary } from './utils/scorer';
 import { printReport, writeJsonReport } from './utils/reporter';
 import { fileExists } from './utils/file-utils';
@@ -22,6 +23,7 @@ const SCANNERS: ScannerModule[] = [
   skillAuditor,
   redTeamSimulator,
   channelSurfaceAuditor,
+  agentConfigAuditor,
 ];
 
 export type ProfileType = 'agent' | 'general' | 'mobile';
@@ -124,7 +126,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
 
   // Build report
   const report: ScanReport = {
-    version: '0.2.1',
+    version: '0.3.0',
     timestamp: new Date().toISOString(),
     target: absPath,
     results,

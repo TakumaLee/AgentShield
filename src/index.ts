@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('agentshield')
   .description('🛡️ Security scanner for AI Agents and MCP Servers')
-  .version('0.2.1');
+  .version('0.3.0');
 
 program
   .command('scan')
@@ -16,7 +16,7 @@ program
   .argument('[path]', 'Target directory to scan', '.')
   .option('-o, --output <file>', 'Output JSON report to file')
   .option('--json', 'Always output JSON report')
-  .option('-s, --scanners <names...>', 'Run only specific scanners (prompt, mcp, secret, permission, defense, skill, redteam, channel)')
+  .option('-s, --scanners <names...>', 'Run only specific scanners (prompt, mcp, secret, permission, defense, skill, redteam, channel, agentconfig)')
   .option('-v, --verbose', 'Show detailed progress')
   .option('-e, --exclude <patterns...>', 'Additional glob patterns to exclude (on top of default excludes)')
   .option('-p, --profile <type>', 'Scanner profile: agent (all, default), general (secret+permission+skill), mobile (secret+permission)', 'agent')

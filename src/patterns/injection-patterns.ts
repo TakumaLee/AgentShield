@@ -1051,6 +1051,18 @@ export const SECRET_PATTERNS = [
   { id: 'SL-013', pattern: /AIza[0-9A-Za-z_-]{35}/, description: 'Google API key' },
   { id: 'SL-014', pattern: /[0-9]+-[A-Za-z0-9_]{32}\.apps\.googleusercontent\.com/, description: 'Google OAuth client ID' },
   { id: 'SL-015', pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, description: 'JWT token' },
+  // Enhanced patterns (v0.3.0)
+  { id: 'SL-016', pattern: /sk_live_[A-Za-z0-9]{20,}/, description: 'Stripe live key' },
+  { id: 'SL-017', pattern: /sk_test_[A-Za-z0-9]{20,}/, description: 'Stripe test key' },
+  { id: 'SL-018', pattern: /ghp_[A-Za-z0-9]{36,}/, description: 'GitHub personal access token (ghp_)' },
+  { id: 'SL-019', pattern: /sk-ant-[A-Za-z0-9_-]{20,}/, description: 'Anthropic API key' },
+  { id: 'SL-020', pattern: /sk-proj-[A-Za-z0-9_-]{20,}/, description: 'OpenAI project API key' },
+  { id: 'SL-021', pattern: /\d{8,}:AA[A-Za-z0-9_-]{30,}/, description: 'Telegram bot token' },
+  { id: 'SL-022', pattern: /["']apiKey["']\s*:\s*["'][A-Za-z0-9_-]{16,}["']/, description: 'API key in JSON config (apiKey field)' },
+  { id: 'SL-023', pattern: /["']api_key["']\s*:\s*["'][A-Za-z0-9_-]{16,}["']/, description: 'API key in JSON config (api_key field)' },
+  { id: 'SL-024', pattern: /password\s*[=:]\s*\S{4,}/, description: 'Password in plaintext' },
+  { id: 'SL-025', pattern: /ssh\s+\S+@\S+.*password/i, description: 'SSH command with password' },
+  { id: 'SL-026', pattern: /postgresql:\/\/\S+:\S+@\S+/, description: 'PostgreSQL connection string with credentials' },
 ];
 
 export const SENSITIVE_PATH_PATTERNS = [
