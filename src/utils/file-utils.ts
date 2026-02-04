@@ -43,6 +43,15 @@ const DEFAULT_IGNORE = [
   '**/tmp/**',
   '**/DerivedData/**',
   '**/agentshield-report*.json',
+  // Browser user-data / extensions (not agent code)
+  '**/browser/*/user-data/**',
+  '**/user-data/*/Extensions/**',
+  '**/chrome-profile/*/Extensions/**',
+  '**/.chromium/**',
+  '**/.chrome/**',
+  '**/Extensions/**',
+  // Session records (data, not code)
+  '**/sessions/**',
 ];
 
 /**

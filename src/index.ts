@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('agentshield')
   .description('🛡️ Security scanner for AI Agents and MCP Servers')
-  .version('0.2.0');
+  .version('0.2.1');
 
 program
   .command('scan')

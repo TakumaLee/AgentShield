@@ -100,7 +100,9 @@ export const permissionAnalyzer: ScannerModule = {
         // Analyze text content for permission-related patterns
         // Only for prompt-like files (.md, .txt), not data/cache files
         // Skip package manifests, dev tool configs — they aren't agent configs
-        if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest) {
+        // Skip plain JSON data files — only code/config/prompt files should be text-analyzed
+        const isPlainJsonData = isJsonFile(file) && !isToolOrMcpConfigContent(file, content);
+        if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest && !isPlainJsonData) {
           findings.push(...analyzeTextPermissions(content, file));
         }
 
@@ -466,6 +468,17 @@ function getAllKeys(obj: Record<string, unknown>, depth = 0, maxDepth = 3): Set<
     }
   }
   return keys;
+}
+
+/**
+ * Quick check: is this JSON file a tool/MCP config (vs plain data)?
+ * Parses the content and delegates to isToolOrMcpConfig.
+ */
+function isToolOrMcpConfigContent(filePath: string, content: string): boolean {
+  if (!isJsonFile(filePath)) return false;
+  const parsed = tryParseJson(content);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  return isToolOrMcpConfig(parsed as Record<string, unknown>);
 }
 
 /**
