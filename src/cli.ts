@@ -46,17 +46,26 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     );
   }
 
-  // Run all scanners
+  // Run all scanners with progress
   const results = [];
-  for (const scanner of activeScanners) {
-    if (options.verbose) {
-      console.log(chalk.gray(`  Running ${scanner.name}...`));
-    }
+  const total = activeScanners.length;
+  for (let i = 0; i < total; i++) {
+    const scanner = activeScanners[i];
+    const step = i + 1;
+    const pct = Math.round((step / total) * 100);
+    const filled = Math.round((step / total) * 20);
+    const empty = 20 - filled;
+    const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+
+    // Clear line and print progress
+    process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name}...`);
+
     const result = await scanner.scan(absPath);
     results.push(result);
-    if (options.verbose) {
-      console.log(chalk.gray(`  ✓ ${scanner.name}: ${result.findings.length} findings (${result.duration}ms)`));
-    }
+
+    // Update with result
+    const findingsColor = result.findings.length > 0 ? chalk.yellow(result.findings.length) : chalk.green('0');
+    process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name} ${chalk.gray('→')} ${findingsColor} findings ${chalk.gray(`(${result.duration}ms)`)}   \n`);
   }
 
   // Build report
