@@ -64,6 +64,7 @@ export interface ReportSummary {
 export interface ScannerOptions {
   exclude?: string[];
   context?: ScanContext;
+  includeVendored?: boolean;
 }
 
 export interface ScannerModule {

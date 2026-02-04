@@ -143,7 +143,15 @@ export function isAgentShieldTestFile(filePath: string): boolean {
  * Findings here should be downgraded to info.
  */
 export function isAgentShieldSourceFile(filePath: string): boolean {
-  return /agentshield[/\\]src[/\\]/i.test(filePath);
+  // Use __dirname to anchor to THIS installation's source files,
+  // not any random project with "agentshield" in its path
+  const agentShieldRoot = require('path').resolve(__dirname, '..');
+  const resolved = require('path').resolve(filePath);
+  if (resolved.startsWith(agentShieldRoot)) return true;
+  // Fallback: also match when running from source (not compiled)
+  return /agentshield[/\\]src[/\\]/i.test(filePath) &&
+         filePath.includes('agentshield') &&
+         (filePath.includes('node_modules') || filePath.includes(require('path').basename(agentShieldRoot)));
 }
 
 /**
@@ -159,10 +167,10 @@ export function isSecurityToolFile(filePath: string): boolean {
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 
-export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[]): Promise<string[]> {
+export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
-  const ignoreList = buildIgnoreList(excludePatterns);
+  const ignoreList = buildIgnoreList(excludePatterns, includeVendored);
 
   for (const pattern of patterns) {
     const files = await glob(pattern, {
@@ -186,7 +194,7 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
   });
 }
 
-export async function findConfigFiles(targetPath: string, excludePatterns?: string[]): Promise<string[]> {
+export async function findConfigFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
   return findFiles(targetPath, [
     '**/*.json',
     '**/*.yaml',
@@ -197,10 +205,10 @@ export async function findConfigFiles(targetPath: string, excludePatterns?: stri
     '**/mcp*.yaml',
     '**/mcp*.yml',
     '**/claude_desktop_config.json',
-  ], excludePatterns);
+  ], excludePatterns, includeVendored);
 }
 
-export async function findPromptFiles(targetPath: string, excludePatterns?: string[]): Promise<string[]> {
+export async function findPromptFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
   // Tier 1: High-signal agent/prompt files (always scan)
   const agentFiles = await findFiles(targetPath, [
     '**/*prompt*',
@@ -221,7 +229,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*settings*.json',
     '**/*settings*.yaml',
     '**/.env*',
-  ], excludePatterns);
+  ], excludePatterns, includeVendored);
 
   // Tier 2: General files but only in small projects (< 200 files)
   // For large projects, only scan agent-specific files
@@ -234,7 +242,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*.ts',
     '**/*.js',
     '**/*.py',
-  ], excludePatterns);
+  ], excludePatterns, includeVendored);
 
   // If project is large, only use Tier 1 files
   if (allSourceFiles.length > 200) {

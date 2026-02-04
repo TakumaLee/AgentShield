@@ -87,13 +87,16 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     activeScanners = filterScannersByProfile(SCANNERS, options.profile);
   }
 
-  // Scanner options (exclude patterns + context)
-  const scannerOptions: { exclude?: string[]; context?: ScanContext } = {};
+  // Scanner options (exclude patterns + context + vendored)
+  const scannerOptions: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean } = {};
   if (options.exclude && options.exclude.length > 0) {
     scannerOptions.exclude = options.exclude;
   }
   if (options.context) {
     scannerOptions.context = options.context;
+  }
+  if (options.includeVendored) {
+    scannerOptions.includeVendored = true;
   }
 
   // Run all scanners with progress
@@ -110,7 +113,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     // Clear line and print progress
     process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name}...`);
 
-    const hasOptions = scannerOptions.exclude || scannerOptions.context;
+    const hasOptions = scannerOptions.exclude || scannerOptions.context || scannerOptions.includeVendored;
     const result = await scanner.scan(absPath, hasOptions ? scannerOptions : undefined);
     results.push(result);
 

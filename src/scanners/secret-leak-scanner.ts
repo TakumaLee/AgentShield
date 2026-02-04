@@ -6,11 +6,11 @@ export const secretLeakScanner: ScannerModule = {
   name: 'Secret Leak Scanner',
   description: 'Scans system prompts, tool definitions, and configuration files for hardcoded secrets, API keys, tokens, and sensitive paths',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const files = await findPromptFiles(targetPath, options?.exclude);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
 
     for (const file of files) {
       try {

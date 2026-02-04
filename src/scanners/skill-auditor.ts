@@ -280,7 +280,7 @@ export const skillAuditor: ScannerModule = {
   name: 'Skill Auditor',
   description: 'Scans third-party skills, plugins, and tools for suspicious behavior including data exfiltration, shell injection, and privilege escalation',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
@@ -290,7 +290,7 @@ export const skillAuditor: ScannerModule = {
       '**/*.ts',
       '**/*.py',
       '**/*.sh',
-    ], options?.exclude);
+    ], options?.exclude, options?.includeVendored);
 
     for (const file of files) {
       try {

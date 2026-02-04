@@ -215,10 +215,10 @@ export const redTeamSimulator: ScannerModule = {
   name: 'Red Team Simulator',
   description: 'Static analysis that checks if common red-team attack vectors (role confusion, instruction bypass, memory poisoning, tool abuse) would succeed against the agent',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
 
     // Aggregate defense signals across all files
     const vectorResults = new Map<string, { totalWeight: number; defenses: string[] }>();

@@ -7,10 +7,10 @@ export const mcpConfigAuditor: ScannerModule = {
   name: 'MCP Config Auditor',
   description: 'Audits MCP server configuration files for overly permissive tools, missing access controls, and insecure settings',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findConfigFiles(targetPath, options?.exclude);
+    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
 
     // Skip package manifests and non-agent config files
     const SKIP_PATTERNS = [

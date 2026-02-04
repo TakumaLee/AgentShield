@@ -382,10 +382,10 @@ export const defenseAnalyzer: ScannerModule = {
   name: 'Defense Analyzer',
   description: 'Checks if a codebase has proper injection defenses including input sanitization, prompt hardening, output filtering, sandboxing, auth, and canary tokens',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
 
     // Aggregate defense signals across all files
     const categoryResults = new Map<string, { totalWeight: number; matchedPatterns: string[]; files: string[] }>();
@@ -440,7 +440,7 @@ export const defenseAnalyzer: ScannerModule = {
     // Also include source files for architecture analysis
     let sourceFiles: string[] = [];
     try {
-      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude);
+      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored);
     } catch {
       // Ignore errors finding source files
     }

@@ -128,11 +128,9 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
       // Scanner breakdown
       scannerBreakdown[result.scanner][finding.severity]++;
 
-      // Dimension mapping
-      const dim = DIMENSION_MAP[result.scanner];
-      if (dim) {
-        dimensionFindings[dim].push(finding);
-      }
+      // Dimension mapping (default to codeSafety for unknown scanners)
+      const dim = DIMENSION_MAP[result.scanner] || 'codeSafety';
+      dimensionFindings[dim].push(finding);
     }
   }
 

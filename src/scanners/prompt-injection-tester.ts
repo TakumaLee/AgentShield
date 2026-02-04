@@ -6,10 +6,10 @@ export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
   description: 'Tests for 110+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
 
-  async scan(targetPath: string, options?: { exclude?: string[] }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
 
     for (const file of files) {
       try {
@@ -202,8 +202,27 @@ export function isDefensePatternFile(content: string, filePath?: string): boolea
     if (matchedCategories.size > 5) return true;
   }
 
-  // Signal 4: Path is defensive AND has injection matches
-  if (pathIsDefensive) return true;
+  // Signal 4: Path alone is not enough — require at least 2 signals
+  // (pathIsDefensive counts as 1; combine with content-based signals)
+  let signals = 0;
+  if (pathIsDefensive) signals++;
+
+  // Content signal: file has injection matches across multiple categories (>= 3)
+  if (!filePath || !isJsonFile(filePath)) {
+    const cats = new Set<string>();
+    const lines = content.split('\n');
+    for (const pattern of INJECTION_PATTERNS) {
+      for (const line of lines) {
+        if (pattern.pattern.test(line)) {
+          cats.add(pattern.category);
+          break;
+        }
+      }
+    }
+    if (cats.size >= 3) signals++;
+  }
+
+  if (signals >= 2) return true;
 
   return false;
 }

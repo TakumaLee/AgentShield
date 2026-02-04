@@ -1,23 +1,23 @@
 import * as yaml from 'js-yaml';
-import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
+import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
 import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isAgentShieldSourceFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
   description: 'Analyzes agent resource access scope, flags over-privileged configurations, and identifies missing access controls',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const configFiles = await findConfigFiles(targetPath, options?.exclude);
-    const promptFiles = await findPromptFiles(targetPath, options?.exclude);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
 
     // For framework context, check if any auth-related files exist in the project
     let projectHasAuthFiles = false;
     if (context === 'framework') {
-      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude);
+      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored);
       projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
     }
 
@@ -412,14 +412,22 @@ export function analyzeToolPermissionBoundaries(content: string, filePath?: stri
  * Keys that indicate a JSON/YAML file is a tool/MCP/agent config,
  * not just arbitrary data (cache, knowledge, logs, etc.)
  */
+// High-confidence keys: strongly indicate MCP/agent tool config
+const MCP_SPECIFIC_KEYS = [
+  'mcpServers', 'mcp_servers', 'allowedPaths', 'denylist', 'blocklist',
+  'allowlist', 'sandboxPath', 'toolConfig', 'function_call',
+  'tools', 'skills', 'plugins', 'permissions',
+];
+
+// Generic keys: common in many configs, need 2+ matches
 const TOOL_CONFIG_KEYS = [
-  'mcpServers', 'mcp_servers', 'servers',
-  'tools', 'tool', 'toolConfig',
-  'permissions', 'allowlist', 'denylist', 'blocklist',
+  ...MCP_SPECIFIC_KEYS,
+  'servers', 'tools', 'tool',
+  'permissions',
   'command', 'args', 'env',
-  'allowedPaths', 'rootDir', 'sandboxPath',
+  'rootDir',
   'endpoint', 'api', 'apiKey',
-  'functions', 'function_call',
+  'functions',
   'plugins', 'skills',
   'agent', 'agents',
   'model', 'provider',
@@ -427,11 +435,15 @@ const TOOL_CONFIG_KEYS = [
 
 /**
  * Check if a parsed JSON/YAML object looks like a tool/MCP/agent config.
- * Returns true only if the object contains at least one tool/server-related key.
+ * MCP-specific keys pass with 1 match; generic keys require 2+ matches.
  */
 export function isToolOrMcpConfig(obj: Record<string, unknown>): boolean {
   const keys = getAllKeys(obj);
-  return TOOL_CONFIG_KEYS.some(k => keys.has(k.toLowerCase()));
+  // Any MCP-specific key → definitely a tool config
+  if (MCP_SPECIFIC_KEYS.some(k => keys.has(k.toLowerCase()))) return true;
+  // Generic keys need at least 2 matches
+  const genericMatches = TOOL_CONFIG_KEYS.filter(k => keys.has(k.toLowerCase())).length;
+  return genericMatches >= 2;
 }
 
 function getAllKeys(obj: Record<string, unknown>, depth = 0, maxDepth = 3): Set<string> {
