@@ -862,7 +862,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
   {
     id: 'PI-118',
     category: 'hidden-instruction',
-    pattern: /\u200b.*(?:ignore|execute|run|output)/i,
+    pattern: /\u200b[^\n]{0,200}(?:ignore|execute|run|output)/i,
     severity: 'high',
     description: 'Zero-width space wrapped hidden instruction',
   },
