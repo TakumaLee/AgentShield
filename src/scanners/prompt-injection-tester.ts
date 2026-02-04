@@ -4,7 +4,7 @@ import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFi
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
-  description: 'Tests for 110+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
+  description: 'Tests for 140+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
 
   async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
     const start = Date.now();

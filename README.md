@@ -239,7 +239,7 @@ npm test           # Run all tests
 npm test -- --coverage  # With coverage report
 ```
 
-636 tests covering all 8 scanners + scoring logic.
+760 tests covering all 8 scanners + scoring logic.
 
 ## 📁 Project Structure
 
@@ -264,7 +264,7 @@ agentshield/
 │       ├── file-utils.ts     # File discovery
 │       ├── scorer.ts         # Grade calculation
 │       └── reporter.ts       # Terminal + JSON output
-├── tests/                    # 636 tests
+├── tests/                    # 760 tests
 ├── package.json
 ├── tsconfig.json
 └── README.md

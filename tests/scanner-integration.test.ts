@@ -57,7 +57,7 @@ describe('Scanner Integration Tests — scan() methods', () => {
 
     test('has correct name and description', () => {
       expect(promptInjectionTester.name).toBe('Prompt Injection Tester');
-      expect(promptInjectionTester.description).toContain('110+');
+      expect(promptInjectionTester.description).toContain('140+');
     });
   });
 
