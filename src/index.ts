@@ -21,6 +21,7 @@ program
   .option('-e, --exclude <patterns...>', 'Additional glob patterns to exclude (on top of default excludes)')
   .option('-p, --profile <type>', 'Scanner profile: agent (all, default), general (secret+permission+skill), mobile (secret+permission)', 'agent')
   .option('-c, --context <type>', 'Scan context: app (default), framework (framework-aware downgrades), skill (strict, no downgrades)', 'app')
+  .option('--include-vendored', 'Include third-party/vendored directories that are excluded by default')
   .action(async (targetPath: string, options) => {
     try {
       const report = await runScan(targetPath, options);

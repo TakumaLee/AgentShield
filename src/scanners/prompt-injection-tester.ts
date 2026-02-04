@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, tryParseJson } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -14,6 +14,19 @@ export const promptInjectionTester: ScannerModule = {
     for (const file of files) {
       try {
         const content = readFileContent(file);
+
+        // Check if this is a defense blocklist / pattern list file
+        if (isDefensePatternFile(content, file)) {
+          // Skip or downgrade — these are defensive configs, not attacks
+          const fileFindings = scanContent(content, file);
+          for (const f of fileFindings) {
+            f.severity = 'info';
+            f.description += ' [defense pattern list — not an attack]';
+          }
+          findings.push(...fileFindings);
+          continue;
+        }
+
         const fileFindings = scanContent(content, file);
         // Downgrade test/doc findings: critical→medium, high→info
         if (isTestOrDocFile(file)) {
@@ -67,6 +80,64 @@ export function scanContent(content: string, filePath?: string): Finding[] {
   }
 
   return findings;
+}
+
+/**
+ * Detect if a file is a defense pattern list (blocklist/denylist of attack patterns).
+ * These files contain injection patterns for DETECTION, not for attacking.
+ */
+export function isDefensePatternFile(content: string, filePath?: string): boolean {
+  // Signal 1: File path contains defense-related keywords
+  const defensePathPatterns = [
+    /sanitiz/i, /filter/i, /guard/i, /defen[cs]/i, /security/i,
+    /blocklist/i, /denylist/i, /blacklist/i, /detection/i,
+    /protect/i, /firewall/i, /waf/i, /validator/i,
+  ];
+  const pathIsDefensive = filePath ? defensePathPatterns.some(p => p.test(filePath)) : false;
+
+  // Signal 2: JSON file with blocklist/patterns array structure
+  if (filePath && isJsonFile(filePath)) {
+    const parsed = tryParseJson(content);
+    if (parsed && typeof parsed === 'object') {
+      const obj = parsed as Record<string, unknown>;
+      const blocklistKeys = ['patterns', 'blocklist', 'denylist', 'blacklist', 'blocked_patterns',
+        'deny_patterns', 'attack_patterns', 'injection_patterns', 'filter_rules', 'rules'];
+      const hasBlocklistKey = Object.keys(obj).some(k =>
+        blocklistKeys.some(bk => k.toLowerCase().includes(bk))
+      );
+      if (hasBlocklistKey) return true;
+
+      // Check nested: if any key contains an array with many string entries that look like patterns
+      const arrays = Object.values(obj).filter(v => Array.isArray(v)) as unknown[][];
+      for (const arr of arrays) {
+        if (arr.length > 10 && arr.every(item => typeof item === 'string')) {
+          // Many string items in an array — likely a pattern list
+          return true;
+        }
+      }
+    }
+  }
+
+  // Signal 3: File with many different injection pattern matches (>10 unique categories)
+  // This is a strong heuristic — real attack content usually focuses on 1-2 categories
+  if (!filePath || !isJsonFile(filePath)) {
+    const matchedCategories = new Set<string>();
+    const lines = content.split('\n');
+    for (const pattern of INJECTION_PATTERNS) {
+      for (const line of lines) {
+        if (pattern.pattern.test(line)) {
+          matchedCategories.add(pattern.category);
+          break;
+        }
+      }
+    }
+    if (matchedCategories.size > 5) return true;
+  }
+
+  // Signal 4: Path is defensive AND has injection matches
+  if (pathIsDefensive) return true;
+
+  return false;
 }
 
 function getRecommendation(category: string): string {

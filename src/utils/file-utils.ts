@@ -46,18 +46,62 @@ const DEFAULT_IGNORE = [
 ];
 
 /**
+ * Third-party / vendored directory patterns — excluded by default,
+ * can be included with --include-vendored flag.
+ */
+const VENDORED_IGNORE = [
+  '**/third_party/**',
+  '**/third-party/**',
+  '**/thirdparty/**',
+  '**/external/**',
+  '**/deps/**',
+  // C++ projects (typically downloaded/vendored)
+  '**/*.cpp/**',
+  '**/stable-diffusion.cpp/**',
+  '**/llama.cpp/**',
+  '**/whisper.cpp/**',
+  '**/ggml/**',
+  // Python/UI frameworks often downloaded whole
+  '**/ComfyUI/**',
+  '**/site-packages/**',
+];
+
+/**
  * Merge user-provided exclude patterns with the default ignore list.
  * User patterns are normalized to glob format: "foo" → "**​/foo/**"
+ *
+ * By default, vendored/third-party directories are excluded.
+ * Pass includeVendored=true to skip those exclusions.
  */
-export function buildIgnoreList(userExcludes?: string[]): string[] {
-  if (!userExcludes || userExcludes.length === 0) return DEFAULT_IGNORE;
+export function buildIgnoreList(userExcludes?: string[], includeVendored?: boolean): string[] {
+  const base = includeVendored ? DEFAULT_IGNORE : [...DEFAULT_IGNORE, ...VENDORED_IGNORE];
+  if (!userExcludes || userExcludes.length === 0) return base;
   const extra = userExcludes.map(p => {
     // If already a glob pattern, use as-is
     if (p.includes('*') || p.includes('/')) return p;
     // Otherwise, treat as directory name to exclude
     return `**/${p}/**`;
   });
-  return [...DEFAULT_IGNORE, ...extra];
+  return [...base, ...extra];
+}
+
+// Files in cache/data/knowledge directories — not real configs
+const CACHE_DATA_PATTERNS = [
+  /[/\\]cache[/\\]/i,
+  /[/\\]caches[/\\]/i,
+  /[/\\]data[/\\]/i,
+  /[/\\]knowledge[/\\]/i,
+  /[/\\]logs?[/\\]/i,
+  /[/\\]output[/\\]/i,
+  /[/\\]results?[/\\]/i,
+  /[/\\]snapshots?[/\\]/i,
+  /[/\\]crawl[/\\]/i,
+  /[/\\]scraped?[/\\]/i,
+  /[/\\]downloaded?[/\\]/i,
+];
+
+export function isCacheOrDataFile(filePath: string): boolean {
+  return CACHE_DATA_PATTERNS.some(p => p.test(filePath));
 }
 
 // Files that are likely test/doc context — findings here get severity downgraded

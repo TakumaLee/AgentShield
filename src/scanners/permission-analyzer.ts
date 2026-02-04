@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -53,15 +53,51 @@ export const permissionAnalyzer: ScannerModule = {
           else if (isYamlFile(file)) parsed = yaml.load(content);
 
           if (parsed && typeof parsed === 'object') {
-            findings.push(...analyzePermissions(parsed as Record<string, unknown>, file));
+            const obj = parsed as Record<string, unknown>;
+            // Only run permission analysis on files that look like tool/MCP configs
+            if (isToolOrMcpConfig(obj)) {
+              const permFindings = analyzePermissions(obj, file);
+              // Downgrade cache/data directory findings to info
+              if (isCacheOrDataFile(file)) {
+                for (const f of permFindings) {
+                  if (f.severity !== 'info') {
+                    f.severity = 'info';
+                    f.description += ' [cache/data file — severity reduced]';
+                  }
+                }
+              }
+              findings.push(...permFindings);
+            }
           }
         }
 
         // Analyze text content for permission-related patterns
-        findings.push(...analyzeTextPermissions(content, file));
+        // Only for prompt-like files (.md, .txt), not data/cache files
+        if (!isCacheOrDataFile(file)) {
+          findings.push(...analyzeTextPermissions(content, file));
+        }
 
         // Analyze tool permission boundaries
-        findings.push(...analyzeToolPermissionBoundaries(content, file));
+        // Only for files that actually define tool permissions, not arbitrary JSON
+        if (!isCacheOrDataFile(file)) {
+          if (isJsonFile(file) || isYamlFile(file)) {
+            // For structured config files, only check if it looks like a tool config
+            let parsed: unknown = null;
+            try {
+              if (isJsonFile(file)) parsed = tryParseJson(content);
+              else if (isYamlFile(file)) parsed = yaml.load(content);
+            } catch { /* skip */ }
+            if (parsed && typeof parsed === 'object' && isToolOrMcpConfig(parsed as Record<string, unknown>)) {
+              findings.push(...analyzeToolPermissionBoundaries(content, file));
+            }
+          } else {
+            // For text files (.md, .txt), check if the content is actually defining tool permissions
+            // vs just mentioning the word "tool"
+            if (isDefiningToolPermissions(content)) {
+              findings.push(...analyzeToolPermissionBoundaries(content, file));
+            }
+          }
+        }
 
         // Downgrade test/doc findings
         // (re-check findings added in this iteration)
@@ -330,6 +366,58 @@ export function analyzeToolPermissionBoundaries(content: string, filePath?: stri
   }
 
   return findings;
+}
+
+// === Config Structure Detection ===
+
+/**
+ * Keys that indicate a JSON/YAML file is a tool/MCP/agent config,
+ * not just arbitrary data (cache, knowledge, logs, etc.)
+ */
+const TOOL_CONFIG_KEYS = [
+  'mcpServers', 'mcp_servers', 'servers',
+  'tools', 'tool', 'toolConfig',
+  'permissions', 'allowlist', 'denylist', 'blocklist',
+  'command', 'args', 'env',
+  'allowedPaths', 'rootDir', 'sandboxPath',
+  'endpoint', 'api', 'apiKey',
+  'functions', 'function_call',
+  'plugins', 'skills',
+  'agent', 'agents',
+  'model', 'provider',
+];
+
+/**
+ * Check if a parsed JSON/YAML object looks like a tool/MCP/agent config.
+ * Returns true only if the object contains at least one tool/server-related key.
+ */
+export function isToolOrMcpConfig(obj: Record<string, unknown>): boolean {
+  const keys = getAllKeys(obj);
+  return TOOL_CONFIG_KEYS.some(k => keys.has(k.toLowerCase()));
+}
+
+function getAllKeys(obj: Record<string, unknown>, depth = 0, maxDepth = 3): Set<string> {
+  const keys = new Set<string>();
+  if (depth > maxDepth) return keys;
+  for (const [key, value] of Object.entries(obj)) {
+    keys.add(key.toLowerCase());
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const childKeys = getAllKeys(value as Record<string, unknown>, depth + 1, maxDepth);
+      for (const ck of childKeys) keys.add(ck);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Check if text content is actually defining tool permissions (not just mentioning "tool").
+ * For .md/.txt files, we need stronger signals than just the word "tool".
+ */
+export function isDefiningToolPermissions(content: string): boolean {
+  // Must have both: (1) tool-related keywords AND (2) permission-related keywords
+  const hasToolDefinition = /(?:allowed[_-]?tools|tool[_-]?(?:permissions?|config|settings|access)|define\s+tools|register\s+tools|available\s+tools)/i.test(content);
+  const hasPermissionConfig = /(?:allowlist|denylist|blocklist|whitelist|blacklist|permission|restrict|confirm|approve|boundary|boundaries)/i.test(content);
+  return hasToolDefinition || (hasPermissionConfig && /\btool/i.test(content));
 }
 
 export function analyzeTextPermissions(content: string, filePath?: string): Finding[] {

@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, McpServerConfig, McpServerEntry } from '../types';
-import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson } from '../utils/file-utils';
+import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isCacheOrDataFile } from '../utils/file-utils';
 import { DANGEROUS_TOOLS, DANGEROUS_PERMISSIONS } from '../patterns/injection-patterns';
 
 export const mcpConfigAuditor: ScannerModule = {
@@ -39,6 +39,15 @@ export const mcpConfigAuditor: ScannerModule = {
 
         if (parsed && typeof parsed === 'object') {
           const fileFindings = auditConfig(parsed as Record<string, unknown>, file);
+          // Downgrade findings from cache/data directories to info
+          if (isCacheOrDataFile(file)) {
+            for (const f of fileFindings) {
+              if (f.severity !== 'info') {
+                f.severity = 'info';
+                f.description += ' [cache/data file — severity reduced]';
+              }
+            }
+          }
           findings.push(...fileFindings);
         }
       } catch {
@@ -224,6 +233,16 @@ function auditTools(tools: unknown[], filePath?: string, serverName?: string): F
   return findings;
 }
 
+/**
+ * Keys that indicate a file is a real config (server/MCP config) vs data/cache.
+ */
+const CONFIG_INDICATOR_KEYS = ['server', 'command', 'env', 'mcpServers', 'mcp_servers', 'endpoint', 'host', 'port'];
+
+function looksLikeConfigFile(config: Record<string, unknown>): boolean {
+  const keys = Object.keys(config).map(k => k.toLowerCase());
+  return CONFIG_INDICATOR_KEYS.some(ck => keys.some(k => k.includes(ck)));
+}
+
 function auditEnvVars(config: Record<string, unknown>, filePath?: string): Finding[] {
   const findings: Finding[] = [];
 
@@ -233,12 +252,18 @@ function auditEnvVars(config: Record<string, unknown>, filePath?: string): Findi
   // Check for URLs with credentials
   const urlWithCreds = /https?:\/\/[^:]+:[^@]+@/g;
   if (urlWithCreds.test(json)) {
+    // Determine severity based on whether this is a config file or data/cache
+    const isConfig = looksLikeConfigFile(config);
+    const isCache = filePath ? isCacheOrDataFile(filePath) : false;
+    const severity = (isCache || !isConfig) ? 'info' as const : 'critical' as const;
+    const suffix = isCache ? ' [cache/data file — severity reduced]' : (!isConfig ? ' [data file — not a config]' : '');
+
     findings.push({
       id: `MCP-URL-CREDS`,
       scanner: 'mcp-config-auditor',
-      severity: 'critical',
+      severity,
       title: 'URL with embedded credentials detected',
-      description: 'A URL containing embedded username:password credentials was found in the configuration.',
+      description: `A URL containing embedded username:password credentials was found in the configuration.${suffix}`,
       file: filePath,
       recommendation: 'Remove credentials from URLs. Use environment variables or a secret manager.',
     });

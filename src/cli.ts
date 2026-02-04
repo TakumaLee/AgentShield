@@ -50,6 +50,7 @@ export interface ScanOptions {
   exclude?: string[];
   profile?: ProfileType;
   context?: ScanContext;
+  includeVendored?: boolean;
 }
 
 export async function runScan(targetPath: string, options: ScanOptions = {}): Promise<ScanReport> {
