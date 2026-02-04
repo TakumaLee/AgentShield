@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 
 export const secretLeakScanner: ScannerModule = {
@@ -31,12 +31,19 @@ export const secretLeakScanner: ScannerModule = {
           }
         }
 
-        // AgentShield's own test files: intentional attack samples → info
+        // AgentShield's own source/test files: pattern definitions, not real secrets
         if (isAgentShieldTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isAgentShieldSourceFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [AgentShield source file — pattern definition, not a real secret]';
             }
           }
         } else if (isTestOrDocFile(file)) {

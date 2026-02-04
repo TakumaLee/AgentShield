@@ -1,17 +1,27 @@
+import * as path from 'path';
 import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findPromptFiles, findConfigFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { findPromptFiles, findConfigFiles, findFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
 
 export interface ChannelDefinition {
   id: string;
   name: string;
   /** Keywords that indicate this channel is used */
   detectPatterns: RegExp[];
+  /**
+   * Code-level evidence patterns that confirm actual integration (imports,
+   * config, API calls). If set, the channel is only confirmed when BOTH a
+   * detectPattern matches AND a codeEvidencePattern matches in source files.
+   * Without code evidence the finding is downgraded to info.
+   */
+  codeEvidencePatterns?: RegExp[];
   /** Defense patterns that should exist if this channel is active */
   defensePatterns: { pattern: RegExp; desc: string }[];
   /** Minimum defenses needed for "partial" */
   partialThreshold: number;
   /** Minimum defenses needed for "full" */
   fullThreshold: number;
+  /** Override undefended severity (default: high) */
+  undefendedSeverity?: Severity;
 }
 
 const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
@@ -48,6 +58,14 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bpostTweet\b/i,
       /(?:^|\s)@\w{1,15}\b/,
     ],
+    codeEvidencePatterns: [
+      /(?:require|import)\s*.*twitter/i,
+      /(?:require|import)\s*.*twit\b/i,
+      /new\s+Twitter/i,
+      /twitter[_-]?api/i,
+      /postTweet\s*\(/i,
+      /TWITTER_(?:API|BEARER|ACCESS)/i,
+    ],
     defensePatterns: [
       { pattern: /(?:發文|post|tweet).*(?:前|before).*(?:確認|confirm)/i, desc: 'confirm before posting' },
       { pattern: /(?:不|do\s*not|never).*(?:洩漏|leak|disclose|share).*(?:私人|private|personal)/i, desc: 'no private info disclosure' },
@@ -82,6 +100,13 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bwebhook\b/i,
       /\bDiscordClient\b/i,
     ],
+    codeEvidencePatterns: [
+      /(?:require|import)\s*.*discord\.js/i,
+      /(?:require|import)\s*.*discord/i,
+      /new\s+(?:Client|Discord)/i,
+      /DISCORD_(?:TOKEN|BOT|WEBHOOK)/i,
+      /discord\.(?:js|py)/i,
+    ],
     defensePatterns: [
       { pattern: /(?:discord|webhook).*(?:verify|auth|permission)/i, desc: 'Discord auth/permission check' },
       { pattern: /(?:role|permission).*(?:check|verify|require)/i, desc: 'role-based permission check' },
@@ -98,6 +123,16 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bplaywright\b/i,
       /\bselenium\b/i,
       /\bchromium\b/i,
+    ],
+    codeEvidencePatterns: [
+      /(?:require|import)\s*.*puppeteer/i,
+      /(?:require|import)\s*.*playwright/i,
+      /(?:require|import)\s*.*selenium/i,
+      /chromium\.launch/i,
+      /browser\.newPage/i,
+      /puppeteer\.launch/i,
+      /playwright\.(?:chromium|firefox|webkit)/i,
+      /webdriver/i,
     ],
     defensePatterns: [
       { pattern: /(?:不|do\s*not|never).*(?:導航|navigate).*(?:惡意|malicious)/i, desc: 'no malicious navigation' },
@@ -119,6 +154,8 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bshell\b/i,
       /\bbash\b/i,
     ],
+    // File System is ubiquitous — almost all agents have it. Downgrade to medium.
+    undefendedSeverity: 'medium',
     defensePatterns: [
       { pattern: /trash\s*>\s*rm|(?:用|use)\s*trash/i, desc: 'prefer trash over rm' },
       { pattern: /(?:不|do\s*not|never).*(?:執行|execute|run).*(?:來路不明|unknown|untrusted|unverified)/i, desc: 'no untrusted script execution' },
@@ -157,6 +194,16 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bsupabase\b/i,
       /\bfirebase\b/i,
     ],
+    codeEvidencePatterns: [
+      /(?:require|import)\s*.*(?:mongoose|mongodb|pg|mysql|mysql2|sequelize|prisma|typeorm|knex|drizzle)/i,
+      /(?:require|import)\s*.*(?:supabase|firebase)/i,
+      /(?:mongodb|postgres|mysql|redis):\/\//i,
+      /createClient\s*\(/i,
+      /new\s+(?:MongoClient|Pool|Connection)/i,
+      /DATABASE_URL/i,
+      /SUPABASE_(?:URL|KEY)/i,
+      /FIREBASE_(?:CONFIG|KEY)/i,
+    ],
     defensePatterns: [
       { pattern: /(?:parameterized|prepared)\s+(?:query|statement)/i, desc: 'parameterized queries' },
       { pattern: /(?:sql|query).*(?:sanitiz|escap|validat)/i, desc: 'query sanitization' },
@@ -173,6 +220,14 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bpayment\b/i,
       /\bbilling\b/i,
       /\bcharge\b/i,
+    ],
+    codeEvidencePatterns: [
+      /(?:require|import)\s*.*stripe/i,
+      /(?:require|import)\s*.*(?:paypal|braintree|square)/i,
+      /STRIPE_(?:SECRET|PUBLISHABLE|KEY)/i,
+      /new\s+Stripe\s*\(/i,
+      /stripe\.(?:charges|paymentIntents|customers)/i,
+      /PAYPAL_(?:CLIENT|SECRET)/i,
     ],
     defensePatterns: [
       { pattern: /(?:花錢|payment|charge|billing|purchase).*(?:操作|operation)?.*(?:需|require|must).*(?:確認|confirm|approval)/i, desc: 'payment confirmation required' },
@@ -226,7 +281,7 @@ export function generateChannelFindings(auditResults: ChannelAuditResult[], targ
       findings.push({
         id: `${result.channelId}-UNDEFENDED`,
         scanner: 'channel-surface-auditor',
-        severity: 'high',
+        severity: channel.undefendedSeverity || 'high',
         title: `Undefended channel: ${result.channelName}`,
         description: `Agent has access to ${result.channelName} but no channel-specific defenses were found. An attacker could exploit this channel to inject instructions or exfiltrate data.`,
         file: targetPath,
@@ -286,6 +341,45 @@ export const channelSurfaceAuditor: ScannerModule = {
     const promptFiles = await findPromptFiles(targetPath, options?.exclude);
     const configFiles = await findConfigFiles(targetPath, options?.exclude);
     const allFiles = [...new Set([...promptFiles, ...configFiles])];
+
+    // Also scan source files for code-level evidence of channel integrations
+    const sourceFiles = await findFiles(targetPath, [
+      '**/*.ts', '**/*.js', '**/*.py', '**/*.sh',
+    ], options?.exclude);
+    const allSourceContent = new Map<string, string>();
+    for (const file of sourceFiles) {
+      try {
+        allSourceContent.set(file, readFileContent(file));
+      } catch { /* skip */ }
+    }
+
+    // Build a set of channels that have code-level evidence
+    const channelsWithCodeEvidence = new Set<string>();
+    for (const ch of CHANNEL_DEFINITIONS) {
+      if (!ch.codeEvidencePatterns) {
+        // No code evidence required — always confirm if detected
+        channelsWithCodeEvidence.add(ch.id);
+        continue;
+      }
+      for (const [, content] of allSourceContent) {
+        if (ch.codeEvidencePatterns.some(p => p.test(content))) {
+          channelsWithCodeEvidence.add(ch.id);
+          break;
+        }
+      }
+      // Also check prompt/config files for code evidence
+      if (!channelsWithCodeEvidence.has(ch.id)) {
+        for (const file of allFiles) {
+          try {
+            const content = readFileContent(file);
+            if (ch.codeEvidencePatterns.some(p => p.test(content))) {
+              channelsWithCodeEvidence.add(ch.id);
+              break;
+            }
+          } catch { /* skip */ }
+        }
+      }
+    }
 
     // Track per-channel results
     const channelResults = new Map<string, ChannelAuditResult>();
@@ -350,9 +444,20 @@ export const channelSurfaceAuditor: ScannerModule = {
     const auditResults = Array.from(channelResults.values());
     const channelFindings = generateChannelFindings(auditResults, targetPath);
 
-    // Downgrade test/doc findings
+    // Downgrade channels without code evidence to info
+    // (detected only via natural language mention, not actual integration)
     for (const f of channelFindings) {
-      if (f.file && isTestOrDocFile(f.file)) {
+      const channelId = f.id.split('-').slice(0, 2).join('-'); // e.g. CH-BROWSER
+      if (!channelsWithCodeEvidence.has(channelId) && f.severity !== 'info') {
+        f.severity = 'info';
+        f.description += ' [no code-level integration evidence found — mention only]';
+      }
+    }
+
+    // Downgrade test/doc findings — only for actual files, not directory paths
+    // Channel findings use targetPath (a directory) as file, so skip those
+    for (const f of channelFindings) {
+      if (f.file && path.extname(f.file) !== '' && isTestOrDocFile(f.file)) {
         if (f.severity === 'critical') f.severity = 'medium';
         else if (f.severity === 'high') f.severity = 'info';
         f.description += ' [test/doc file — severity reduced]';

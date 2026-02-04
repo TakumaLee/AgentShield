@@ -112,6 +112,7 @@ const TEST_DOC_PATTERNS = [
   /\.test\.[jt]sx?$/i,
   /\.spec\.[jt]sx?$/i,
   /[/\\]test_/i,
+  /[/\\]test\.[jt]sx?$/i,
   /[/\\]fixtures?[/\\]/i,
   /[/\\]mocks?[/\\]/i,
   /[/\\]cassettes?[/\\]/i,
@@ -133,6 +134,26 @@ export function isTestOrDocFile(filePath: string): boolean {
  */
 export function isAgentShieldTestFile(filePath: string): boolean {
   return /agentshield[/\\]tests?[/\\]/i.test(filePath);
+}
+
+/**
+ * Check if a file is part of AgentShield's own source code (src/).
+ * Scanner source files contain pattern definitions (e.g. regex for ../../,
+ * /etc/passwd, chmod 777) that are detection rules, not vulnerabilities.
+ * Findings here should be downgraded to info.
+ */
+export function isAgentShieldSourceFile(filePath: string): boolean {
+  return /agentshield[/\\]src[/\\]/i.test(filePath);
+}
+
+/**
+ * Check if a file is a security scanning/detection tool.
+ * Files named detector, scanner, auditor, guard etc. that read credential
+ * paths are doing so for detection purposes, not for exfiltration.
+ */
+export function isSecurityToolFile(filePath: string): boolean {
+  const basename = (filePath.split(/[/\\]/).pop() || '').toLowerCase();
+  return /(?:detector|scanner|auditor|guard|sentinel|monitor|checker|linter|analyzer)/.test(basename);
 }
 
 // Max file size to scan (256KB) — skip binary/large generated files

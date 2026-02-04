@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -312,12 +312,19 @@ export const skillAuditor: ScannerModule = {
           }
         }
 
-        // AgentShield's own test files: intentional attack samples → info
+        // AgentShield's own source/test files: pattern definitions, not vulnerabilities
         if (isAgentShieldTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isAgentShieldSourceFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [AgentShield source file — pattern definition, not a vulnerability]';
             }
           }
         } else if (isTestOrDocFile(file)) {
@@ -326,6 +333,17 @@ export const skillAuditor: ScannerModule = {
             if (f.severity === 'critical') f.severity = 'medium';
             else if (f.severity === 'high') f.severity = 'info';
             f.description += ' [test/doc file — severity reduced]';
+          }
+        }
+
+        // Security tools (detector, scanner, auditor, guard) reading credential
+        // paths is normal behavior — they need to detect credential leaks
+        if (isSecurityToolFile(file)) {
+          for (const f of fileFindings) {
+            if (f.id.startsWith('SA-002-') && f.title === 'Reading sensitive file' && f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [security tool file — reading credential paths for detection is expected behavior]';
+            }
           }
         }
 

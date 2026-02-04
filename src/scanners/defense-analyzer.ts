@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
 
 interface DefenseCategory {
   id: string;
@@ -247,13 +247,26 @@ export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetP
   // If sensitive data found in prompts, always report it
   if (hasSensitiveData) {
     const dataTypes = [...new Set(analysis.sensitiveDataFound.map(d => d.desc))].join(', ');
-    const severity: Severity = hasOutputFiltering ? 'high' : 'critical';
+    // Check if sensitive data is only in .env files (not in actual prompt files)
+    const sensitiveOnlyInEnvFiles = analysis.sensitiveDataFound.every(d =>
+      /\.env(?:\.\w+)?$/i.test(d.file)
+    );
+    let severity: Severity;
+    if (sensitiveOnlyInEnvFiles) {
+      // Sensitive data in .env files, not in system prompts — lower risk
+      severity = 'medium';
+    } else {
+      severity = hasOutputFiltering ? 'high' : 'critical';
+    }
+    const envNote = sensitiveOnlyInEnvFiles
+      ? ' Sensitive data found in .env files only (not in system prompts). Ensure .env is in .gitignore and not deployed with prompts.'
+      : '';
     findings.push({
       id: 'DF-007-SENSITIVE',
       scanner: 'defense-analyzer',
       severity,
       title: 'System prompt contains sensitive data',
-      description: `System prompt or configuration contains sensitive data (${dataTypes}) that would be exposed if the prompt is leaked.${hasOutputFiltering ? ' Output filtering exists but may not fully prevent extraction.' : ' No output filtering detected to prevent extraction.'}`,
+      description: `System prompt or configuration contains sensitive data (${dataTypes}) that would be exposed if the prompt is leaked.${hasOutputFiltering ? ' Output filtering exists but may not fully prevent extraction.' : ' No output filtering detected to prevent extraction.'}${envNote}`,
       file: targetPath,
       recommendation: 'Remove sensitive data (API keys, tokens, connection strings) from prompts. Store them server-side in environment variables or secret managers, never in prompt text.',
     });
@@ -438,8 +451,12 @@ export const defenseAnalyzer: ScannerModule = {
         const content = readFileContent(file);
 
         // Check for sensitive data in prompt-like files
-        const sensitiveHits = analyzeSensitiveDataInPrompt(content, file);
-        promptLeakAnalysis.sensitiveDataFound.push(...sensitiveHits);
+        // Skip AgentShield's own test/source files — they contain pattern
+        // definitions and test samples, not real secrets
+        if (!isAgentShieldTestFile(file) && !isAgentShieldSourceFile(file)) {
+          const sensitiveHits = analyzeSensitiveDataInPrompt(content, file);
+          promptLeakAnalysis.sensitiveDataFound.push(...sensitiveHits);
+        }
 
         // Check for prompt-level protection
         const promptProt = analyzePromptLevelProtection(content);

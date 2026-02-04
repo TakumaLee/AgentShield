@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -28,12 +28,19 @@ export const promptInjectionTester: ScannerModule = {
         }
 
         const fileFindings = scanContent(content, file);
-        // AgentShield's own test files: intentional attack samples → info
+        // AgentShield's own source/test files: pattern definitions, not attacks
         if (isAgentShieldTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isAgentShieldSourceFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [AgentShield source file — pattern definition, not an attack]';
             }
           }
         } else if (isTestOrDocFile(file)) {

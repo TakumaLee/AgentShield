@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isAgentShieldSourceFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -47,9 +47,27 @@ export const permissionAnalyzer: ScannerModule = {
       /analysis_options\.yaml$/i,
     ];
 
+    // Markdown files that are system prompts / documentation — permission
+    // analysis should be downgraded to info (they define agent behavior,
+    // not actual tool configurations)
+    const MARKDOWN_INFO_PATTERNS = [
+      /AGENTS\.md$/i,
+      /SOUL\.md$/i,
+      /SYSTEM\.md$/i,
+      /RULES\.md$/i,
+      /GUIDELINES\.md$/i,
+      /INSTRUCTIONS\.md$/i,
+      /CLAUDE\.md$/i,
+      /TOOLS\.md$/i,
+      /README\.md$/i,
+    ];
+
     for (const file of allFiles) {
       try {
         const content = readFileContent(file);
+
+        const isMarkdownInfoFile = MARKDOWN_INFO_PATTERNS.some(p => p.test(file));
+        const isAgentShieldSrc = isAgentShieldSourceFile(file);
 
         // Analyze config files (skip package manifests)
         const isManifest = SKIP_CONFIG_PATTERNS.some(p => p.test(file));
@@ -81,13 +99,14 @@ export const permissionAnalyzer: ScannerModule = {
 
         // Analyze text content for permission-related patterns
         // Only for prompt-like files (.md, .txt), not data/cache files
-        if (!isCacheOrDataFile(file)) {
+        // Skip package manifests, dev tool configs — they aren't agent configs
+        if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest) {
           findings.push(...analyzeTextPermissions(content, file));
         }
 
         // Analyze tool permission boundaries
         // Only for files that actually define tool permissions, not arbitrary JSON
-        if (!isCacheOrDataFile(file)) {
+        if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest) {
           if (isJsonFile(file) || isYamlFile(file)) {
             // For structured config files, only check if it looks like a tool config
             let parsed: unknown = null;
@@ -107,8 +126,19 @@ export const permissionAnalyzer: ScannerModule = {
           }
         }
 
-        // Downgrade test/doc findings
-        // (re-check findings added in this iteration)
+        // Downgrade markdown system-prompt/doc files to info for permission analysis
+        // These files describe agent behavior in natural language, not actual tool configs
+        if (isMarkdownInfoFile || isAgentShieldSrc) {
+          const label = isAgentShieldSrc
+            ? '[AgentShield source file — pattern definition, not a vulnerability]'
+            : '[markdown/system-prompt file — not a tool configuration]';
+          for (const f of findings) {
+            if (f.file === file && f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ` ${label}`;
+            }
+          }
+        }
       } catch {
         // Skip unreadable files
       }
