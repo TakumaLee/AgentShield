@@ -473,6 +473,9 @@ export const defenseAnalyzer: ScannerModule = {
 
     findings.push(...defenseFindings);
 
+    // Confidence: possible — inferential analysis of missing defenses
+    for (const f of findings) f.confidence = 'possible';
+
     return {
       scanner: 'Defense Analyzer',
       findings,

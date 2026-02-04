@@ -105,6 +105,9 @@ export const permissionAnalyzer: ScannerModule = {
       }
     }
 
+    // Confidence: likely — static analysis of permissions, may have false positives
+    for (const f of findings) f.confidence = 'likely';
+
     return {
       scanner: 'Permission Analyzer',
       findings,

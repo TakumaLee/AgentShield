@@ -317,6 +317,9 @@ export const skillAuditor: ScannerModule = {
       }
     }
 
+    // Confidence: likely — static analysis, patterns may have false positives
+    for (const f of findings) f.confidence = 'likely';
+
     return {
       scanner: 'Skill Auditor',
       findings,

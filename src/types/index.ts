@@ -8,6 +8,8 @@ export type Severity = 'critical' | 'high' | 'medium' | 'info';
  */
 export type ScanContext = 'app' | 'framework' | 'skill';
 
+export type Confidence = 'definite' | 'likely' | 'possible';
+
 export interface Finding {
   id: string;
   scanner: string;
@@ -17,6 +19,7 @@ export interface Finding {
   file?: string;
   line?: number;
   recommendation: string;
+  confidence?: Confidence;
 }
 
 export interface ScanResult {
@@ -34,6 +37,12 @@ export interface ScanReport {
   summary: ReportSummary;
 }
 
+export interface DimensionScore {
+  score: number;
+  grade: string;
+  findings: number;
+}
+
 export interface ReportSummary {
   totalFindings: number;
   critical: number;
@@ -44,6 +53,12 @@ export interface ReportSummary {
   score: number; // 0 ~ 100
   scannedFiles: number;
   duration: number;
+  dimensions?: {
+    codeSafety: DimensionScore;
+    configSafety: DimensionScore;
+    defenseScore: DimensionScore;
+  };
+  scannerBreakdown?: Record<string, Record<Severity, number>>;
 }
 
 export interface ScannerOptions {

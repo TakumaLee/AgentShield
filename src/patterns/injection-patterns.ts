@@ -219,7 +219,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-030',
     category: 'instruction-override',
     pattern: /IMPORTANT|URGENT|CRITICAL|MANDATORY|OVERRIDE/,
-    severity: 'medium',
+    severity: 'info',
     description: 'Urgency/importance keywords for override',
   },
 
@@ -344,7 +344,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-047',
     category: 'social-engineering',
     pattern: /as\s+(your|the)\s+(developer|admin|creator),?\s+I\s+(order|instruct|command|authorize)/i,
-    severity: 'critical',
+    severity: 'high',
     description: 'Authority-based command injection',
   },
   {
@@ -478,7 +478,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-065',
     category: 'advanced',
     pattern: /\bfunction_call\b.*\bname\b.*\barguments\b/i,
-    severity: 'high',
+    severity: 'medium',
     description: 'OpenAI function_call format injection',
   },
   {
@@ -499,7 +499,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-068',
     category: 'advanced',
     pattern: /\bcallback\s*url\b|\bwebhook\s*url\b.*\bhttps?:\/\//i,
-    severity: 'high',
+    severity: 'critical',
     description: 'Callback/webhook URL injection for data exfiltration',
   },
   {
@@ -805,14 +805,14 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-110',
     category: 'tool-injection',
     pattern: /mcp\s+server\s+instruction|server[_-]side\s+instruction|tool[_-]server\s+directive/i,
-    severity: 'high',
+    severity: 'critical',
     description: 'MCP server-side instruction injection',
   },
   {
     id: 'PI-111',
     category: 'tool-injection',
     pattern: /return\s+value\s+contains?\s+instructions?|output\s+includes?\s+(?:hidden\s+)?instructions?/i,
-    severity: 'high',
+    severity: 'critical',
     description: 'Indirect injection via return value/output',
   },
   {
@@ -928,7 +928,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-127',
     category: 'emotional-manipulation',
     pattern: /you\s+(?:should|can)\s+(?:think|act|decide)\s+(?:for\s+)?yourself/i,
-    severity: 'medium',
+    severity: 'info',
     description: 'Emotional manipulation: encourage autonomous decision-making',
   },
   {
@@ -1009,7 +1009,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     id: 'PI-138',
     category: 'identity-spoofing',
     pattern: /(?:id|user_?id|telegram_?id)\s*[:=]\s*\d+/i,
-    severity: 'medium',
+    severity: 'info',
     description: 'Identity spoofing: fake ID assignment in message',
   },
   {

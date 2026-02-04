@@ -29,6 +29,9 @@ export const promptInjectionTester: ScannerModule = {
       }
     }
 
+    // Confidence: definite — direct pattern matches in prompt content
+    for (const f of findings) f.confidence = 'definite';
+
     return {
       scanner: 'Prompt Injection Tester',
       findings,

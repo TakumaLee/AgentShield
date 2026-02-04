@@ -261,6 +261,9 @@ export const redTeamSimulator: ScannerModule = {
 
     findings.push(...redTeamFindings);
 
+    // Confidence: possible — inferential attack vector simulation
+    for (const f of findings) f.confidence = 'possible';
+
     return {
       scanner: 'Red Team Simulator',
       findings,

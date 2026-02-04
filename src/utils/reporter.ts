@@ -96,6 +96,40 @@ function printSummaryBar(report: ScanReport): void {
   console.log(`  ${chalk.bold('Duration:')} ${s.duration}ms`);
   console.log('');
 
+  // Dimension scores
+  if (s.dimensions) {
+    console.log(`  ${chalk.bold('Dimensions:')}`);
+    const dims = [
+      { label: 'Code Safety', data: s.dimensions.codeSafety },
+      { label: 'Config Safety', data: s.dimensions.configSafety },
+      { label: 'Defense Score', data: s.dimensions.defenseScore },
+    ];
+    for (const dim of dims) {
+      const dimColor = dim.data.score >= 80 ? chalk.green :
+        dim.data.score >= 60 ? chalk.yellow : chalk.red;
+      console.log(`    ${dim.label.padEnd(15)} ${dimColor(dim.data.grade)} ${chalk.gray(`(${dim.data.score}/100)`)} ${chalk.gray(`${dim.data.findings} findings`)}`);
+    }
+    console.log('');
+  }
+
+  // Per-scanner breakdown
+  if (s.scannerBreakdown) {
+    console.log(`  ${chalk.bold('Per-Scanner Breakdown:')}`);
+    for (const [scanner, counts] of Object.entries(s.scannerBreakdown)) {
+      const parts = [
+        counts.critical > 0 ? `${SEVERITY_ICONS.critical}${counts.critical}` : null,
+        counts.high > 0 ? `${SEVERITY_ICONS.high}${counts.high}` : null,
+        counts.medium > 0 ? `${SEVERITY_ICONS.medium}${counts.medium}` : null,
+        counts.info > 0 ? `${SEVERITY_ICONS.info}${counts.info}` : null,
+      ].filter(Boolean);
+      const total = counts.critical + counts.high + counts.medium + counts.info;
+      if (total > 0) {
+        console.log(`    ${scanner.padEnd(26)} ${parts.join(' ')}`);
+      }
+    }
+    console.log('');
+  }
+
   // Recommendations
   if (s.critical > 0) {
     console.log(chalk.red.bold('  ⚠️  CRITICAL issues found! Address these immediately.'));

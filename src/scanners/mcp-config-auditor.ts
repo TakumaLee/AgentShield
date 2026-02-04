@@ -46,6 +46,9 @@ export const mcpConfigAuditor: ScannerModule = {
       }
     }
 
+    // Confidence: definite — config-based findings are concrete
+    for (const f of findings) f.confidence = 'definite';
+
     return {
       scanner: 'MCP Config Auditor',
       findings,

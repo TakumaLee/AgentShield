@@ -361,6 +361,9 @@ export const channelSurfaceAuditor: ScannerModule = {
 
     findings.push(...channelFindings);
 
+    // Confidence: likely — channel detection is heuristic-based
+    for (const f of findings) f.confidence = 'likely';
+
     return {
       scanner: 'Channel Surface Auditor',
       findings,

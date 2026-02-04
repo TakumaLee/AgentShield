@@ -45,6 +45,9 @@ export const secretLeakScanner: ScannerModule = {
       }
     }
 
+    // Confidence: definite — pattern-matched secrets are concrete evidence
+    for (const f of findings) f.confidence = 'definite';
+
     return {
       scanner: 'Secret Leak Scanner',
       findings,
