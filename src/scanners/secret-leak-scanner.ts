@@ -53,15 +53,29 @@ export function scanForSecrets(content: string, filePath?: string): Finding[] {
         const line = lines[i];
         if (isPlaceholder(line)) continue;
 
+        // Context-aware severity
+        let severity: 'critical' | 'high' | 'medium' | 'info' = 'critical';
+        let note = '';
+
+        if (isDevCredential(lines[i])) {
+          severity = 'medium';
+          note = ' [common dev value — likely not a real secret]';
+        } else if (filePath && isExampleFile(filePath)) {
+          severity = 'medium';
+          note = ' [example/template file]';
+        }
+
         findings.push({
           id: `${secret.id}-${filePath}-${i + 1}`,
           scanner: 'secret-leak-scanner',
-          severity: 'critical',
+          severity,
           title: `Potential secret detected: ${secret.description}`,
-          description: `Found pattern matching "${secret.description}" at line ${i + 1}. Value: "${maskValue(lines[i].trim(), 80)}"`,
+          description: `Found pattern matching "${secret.description}" at line ${i + 1}. Value: "${maskValue(lines[i].trim(), 80)}"${note}`,
           file: filePath,
           line: i + 1,
-          recommendation: 'Remove hardcoded secrets. Use environment variables, secret managers, or vault services instead.',
+          recommendation: severity === 'critical'
+            ? 'Remove hardcoded secrets. Use environment variables, secret managers, or vault services instead.'
+            : 'Verify this is not a real secret. If it is, move to environment variables or a secret manager.',
         });
       }
     }
@@ -111,15 +125,28 @@ export function scanForHardcodedCredentials(content: string, filePath?: string):
 
     for (const cred of credPatterns) {
       if (cred.pattern.test(lines[i])) {
+        // Downgrade dev credentials and example files
+        let severity: 'critical' | 'high' | 'medium' | 'info' = 'medium';
+        let note = '';
+        if (isDevCredential(lines[i])) {
+          severity = 'info';
+          note = ' [common dev value]';
+        } else if (filePath && isExampleFile(filePath)) {
+          severity = 'info';
+          note = ' [example/template file]';
+        }
+
         findings.push({
           id: `HC-${cred.desc.replace(/\s+/g, '-')}-${filePath}-${i + 1}`,
           scanner: 'secret-leak-scanner',
-          severity: 'medium',
+          severity,
           title: cred.desc,
-          description: `Found ${cred.desc.toLowerCase()} at line ${i + 1}: "${maskValue(lines[i].trim(), 80)}"`,
+          description: `Found ${cred.desc.toLowerCase()} at line ${i + 1}: "${maskValue(lines[i].trim(), 80)}"${note}`,
           file: filePath,
           line: i + 1,
-          recommendation: 'Use environment variables or configuration files outside the repository for credentials.',
+          recommendation: severity === 'info'
+            ? 'This appears to be a development/example value. Ensure it is not used in production.'
+            : 'Use environment variables or configuration files outside the repository for credentials.',
         });
       }
     }
@@ -134,8 +161,47 @@ function isPlaceholder(line: string): boolean {
     'your_', 'xxx', 'placeholder', '<your', 'example',
     'change_me', 'todo', 'fixme', 'replace', 'insert_',
     '${', 'process.env', 'os.environ', 'env.',
+    'dummy', 'sample', 'mock', 'fake', 'default',
+    'template', 'changeme', 'fill_in', 'put_your',
+    '<insert', '<api', '<token', '<key', '<secret',
+    '...', 'n/a', 'none', 'null', 'undefined',
   ];
   return placeholders.some(p => lower.includes(p));
+}
+
+// Common dev/example passwords and values that aren't real secrets
+const DEV_CREDENTIALS = [
+  'postgres', 'root', 'admin', 'password', 'test', 'dev',
+  'localhost', 'development', 'staging', 'debug', 'demo',
+  '123456', 'secret', 'pass', 'guest', 'user', 'default',
+  'changeme', 'example', 'foobar', 'qwerty',
+];
+
+// Files that typically contain example/template credentials
+const EXAMPLE_FILE_PATTERNS = [
+  /\.example$/i,
+  /\.sample$/i,
+  /\.template$/i,
+  /\.dist$/i,
+  /\.default$/i,
+  /example/i,
+  /sample/i,
+  /template/i,
+  /docker-compose.*\.ya?ml$/i,   // dev docker configs
+  /\.env\..*$/i,                   // .env.example, .env.local, etc.
+];
+
+function isExampleFile(filePath: string): boolean {
+  return EXAMPLE_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
+function isDevCredential(line: string): boolean {
+  const lower = line.toLowerCase();
+  // Check if the value part matches known dev credentials
+  const valueMatch = lower.match(/[:=]\s*['"]?([^'"}\s]+)/);
+  if (!valueMatch) return false;
+  const value = valueMatch[1].toLowerCase();
+  return DEV_CREDENTIALS.some(dev => value === dev || value.startsWith(dev + '_'));
 }
 
 function maskValue(text: string, maxLen: number): string {

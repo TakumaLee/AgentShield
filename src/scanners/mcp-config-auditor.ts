@@ -12,7 +12,21 @@ export const mcpConfigAuditor: ScannerModule = {
     const findings: Finding[] = [];
     const files = await findConfigFiles(targetPath);
 
+    // Skip package manifests and non-agent config files
+    const SKIP_PATTERNS = [
+      /package\.json$/,
+      /tsconfig\.json$/,
+      /pubspec\.yaml$/,
+      /\.eslintrc/,
+      /jest\.config/,
+      /release-please/,
+      /renovate/,
+      /dependabot/,
+    ];
+
     for (const file of files) {
+      if (SKIP_PATTERNS.some(p => p.test(file))) continue;
+
       try {
         const content = readFileContent(file);
         let parsed: unknown = null;
