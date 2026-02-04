@@ -25,7 +25,7 @@ describe('Secret Leak Scanner — scan() integration', () => {
   test('scan() detects secrets in prompt files', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'system-prompt.md'),
-      'Use this API key: sk-proj-abcdefghijklmnopqrstuvwxyz12345678901234567890'
+      'token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"'
     );
     const result = await secretLeakScanner.scan(tmpDir);
     expect(result.findings.length).toBeGreaterThan(0);
@@ -142,7 +142,8 @@ describe('Secret Leak Scanner — additional unit tests', () => {
   });
 
   test('scanForSecrets detects AWS access key', () => {
-    const findings = scanForSecrets('aws_access_key_id = "AKIAIOSFODNN7EXAMPLE1"', 'config.ts');
+    // AKIA followed by exactly 16 uppercase/digits
+    const findings = scanForSecrets('aws_key = "AKIAIOSFODNN7REALKEY"', 'config.ts');
     expect(findings.length).toBeGreaterThan(0);
   });
 
