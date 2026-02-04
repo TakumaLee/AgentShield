@@ -17,7 +17,7 @@ AgentShield scans your AI agent configurations, system prompts, and MCP server s
 ```bash
 npm install -g agentshield
 # or use directly
-npx agentshield scan [path]
+npx aiagentshield scan [path]
 ```
 
 ## 🚀 Usage
@@ -206,7 +206,7 @@ Findings:
 
 ```bash
 # In your CI pipeline - fails with exit code 2 on critical, 1 on high
-npx agentshield scan ./my-agent/ --json -o agentshield-report.json
+npx aiagentshield scan ./my-agent/ --json -o agentshield-report.json
 ```
 
 Exit codes:

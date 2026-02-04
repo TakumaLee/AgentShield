@@ -1,5 +1,5 @@
 {
-  "name": "agentshield",
+  "name": "aiagentshield",
   "version": "0.1.0",
   "description": "Security scanner for AI Agents and MCP Servers — like npm audit for AI",
   "main": "dist/cli.js",
@@ -10,7 +10,7 @@
     "url": "https://github.com/TakumaLee/AgentShield.git"
   },
   "bin": {
-    "agentshield": "dist/index.js"
+    "aiagentshield": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
