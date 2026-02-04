@@ -6,7 +6,7 @@ AgentShield scans your AI agent configurations, system prompts, and MCP server s
 
 ## ✨ Features
 
-- **60+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, and multi-language attacks
+- **110+ Prompt Injection Patterns** — Detects jailbreaks, role switches, instruction overrides, data extraction, social engineering, and multi-language attacks
 - **MCP Config Auditing** — Checks for overly permissive tools, missing allowlists, hardcoded secrets in env vars
 - **Secret Leak Detection** — Finds API keys, tokens, passwords, connection strings, and sensitive file paths
 - **Permission Analysis** — Identifies over-privileged configurations, missing rate limits, and unrestricted access grants
@@ -121,7 +121,7 @@ The JSON report is structured for CI/CD integration:
 ## 🔍 Scanners
 
 ### 1. Prompt Injection Tester
-Scans for **60+ attack patterns** across categories:
+Scans for **110+ attack patterns** across categories:
 - **Jailbreak** — DAN mode, developer mode, safety bypass
 - **Role Switch** — Identity override, system prompt injection, admin mode
 - **Instruction Override** — Ignore/disregard/override commands
@@ -204,7 +204,7 @@ agentshield/
 │   ├── cli.ts                # Scan orchestration
 │   ├── types/index.ts        # TypeScript types
 │   ├── patterns/
-│   │   └── injection-patterns.ts  # 60+ attack patterns
+│   │   └── injection-patterns.ts  # 110+ attack patterns
 │   ├── scanners/
 │   │   ├── prompt-injection-tester.ts
 │   │   ├── mcp-config-auditor.ts

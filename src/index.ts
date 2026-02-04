@@ -16,7 +16,7 @@ program
   .argument('[path]', 'Target directory to scan', '.')
   .option('-o, --output <file>', 'Output JSON report to file')
   .option('--json', 'Always output JSON report')
-  .option('-s, --scanners <names...>', 'Run only specific scanners (prompt, mcp, secret, permission)')
+  .option('-s, --scanners <names...>', 'Run only specific scanners (prompt, mcp, secret, permission, defense, skill, redteam)')
   .option('-v, --verbose', 'Show detailed progress')
   .action(async (targetPath: string, options) => {
     try {

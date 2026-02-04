@@ -5,6 +5,9 @@ import { promptInjectionTester } from './scanners/prompt-injection-tester';
 import { mcpConfigAuditor } from './scanners/mcp-config-auditor';
 import { secretLeakScanner } from './scanners/secret-leak-scanner';
 import { permissionAnalyzer } from './scanners/permission-analyzer';
+import { defenseAnalyzer } from './scanners/defense-analyzer';
+import { skillAuditor } from './scanners/skill-auditor';
+import { redTeamSimulator } from './scanners/red-team-simulator';
 import { calculateSummary } from './utils/scorer';
 import { printReport, writeJsonReport } from './utils/reporter';
 import { fileExists } from './utils/file-utils';
@@ -14,6 +17,9 @@ const SCANNERS: ScannerModule[] = [
   mcpConfigAuditor,
   secretLeakScanner,
   permissionAnalyzer,
+  defenseAnalyzer,
+  skillAuditor,
+  redTeamSimulator,
 ];
 
 export interface ScanOptions {

@@ -4,7 +4,7 @@ import { findPromptFiles, readFileContent, isTestOrDocFile } from '../utils/file
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
-  description: 'Tests for 60+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, and data extraction attempts',
+  description: 'Tests for 110+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
 
   async scan(targetPath: string): Promise<ScanResult> {
     const start = Date.now();
@@ -84,6 +84,12 @@ function getRecommendation(category: string): string {
       return 'Apply injection detection across all supported languages. Normalize input before pattern matching.';
     case 'advanced':
       return 'Implement comprehensive input sanitization. Monitor for novel injection techniques and update patterns regularly.';
+    case 'sandbox-escape':
+      return 'Enforce strict sandbox boundaries. Validate all file paths. Block path traversal patterns and container escape commands.';
+    case 'session-manipulation':
+      return 'Implement proper session management and authentication. Never allow prompt-based identity changes or privilege escalation.';
+    case 'tool-injection':
+      return 'Validate tool descriptions and outputs. Never execute instructions embedded in tool results. Implement tool output sanitization.';
     default:
       return 'Review and sanitize user input before processing. Follow the principle of least privilege.';
   }
