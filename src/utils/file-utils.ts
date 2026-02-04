@@ -126,6 +126,15 @@ export function isTestOrDocFile(filePath: string): boolean {
   return TEST_DOC_PATTERNS.some(p => p.test(filePath));
 }
 
+/**
+ * Check if a file is part of AgentShield's own test suite.
+ * These contain intentional attack pattern samples for testing the scanner,
+ * so findings here should be downgraded to info.
+ */
+export function isAgentShieldTestFile(filePath: string): boolean {
+  return /agentshield[/\\]tests?[/\\]/i.test(filePath);
+}
+
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 

@@ -21,24 +21,30 @@ export const permissionAnalyzer: ScannerModule = {
       projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
     }
 
-    // Skip generic package manifests — they aren't agent configs
+    // Skip generic package manifests & dev tool configs — they aren't agent configs
     const SKIP_CONFIG_PATTERNS = [
       /package\.json$/,
-      /tsconfig\.json$/,
+      /package-lock\.json$/,
+      /tsconfig(\.[^/\\]+)?\.json$/i,
       /pubspec\.yaml$/,
       /Cargo\.toml$/,
       /pyproject\.toml$/,
       /\.eslintrc/,
       /\.prettierrc/,
+      /prettier\.config\./,
       /jest\.config/,
+      /vitest\.config/,
       /vite\.config/,
       /webpack\.config/,
+      /babel\.config/,
+      /\.babelrc/,
       /release-please/,
       /renovate/,
       /dependabot/,
       /\.github\//,
       /firebase\.json$/,
       /firestore\.indexes\.json$/,
+      /analysis_options\.yaml$/i,
     ];
 
     for (const file of allFiles) {
@@ -47,7 +53,9 @@ export const permissionAnalyzer: ScannerModule = {
 
         // Analyze config files (skip package manifests)
         const isManifest = SKIP_CONFIG_PATTERNS.some(p => p.test(file));
-        if (!isManifest && (isJsonFile(file) || isYamlFile(file))) {
+        // Chrome extension / web app manifest.json — not a tool config
+        const isWebManifest = /manifest\.json$/i.test(file) && content.includes('"manifest_version"');
+        if (!isManifest && !isWebManifest && (isJsonFile(file) || isYamlFile(file))) {
           let parsed: unknown = null;
           if (isJsonFile(file)) parsed = tryParseJson(content);
           else if (isYamlFile(file)) parsed = yaml.load(content);

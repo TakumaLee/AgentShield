@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -302,8 +302,26 @@ export const skillAuditor: ScannerModule = {
           applyFrameworkDowngrades(fileFindings, file);
         }
 
-        // Downgrade test/doc findings
-        if (isTestOrDocFile(file)) {
+        // App context (default): SA-003d shell imports are normal for agent tools
+        if (context === 'app') {
+          for (const f of fileFindings) {
+            if (f.id.startsWith('SA-003d-') && f.severity === 'medium') {
+              f.severity = 'info';
+              f.description += ' [App context: shell execution is a normal capability for AI agent tools.]';
+            }
+          }
+        }
+
+        // AgentShield's own test files: intentional attack samples → info
+        if (isAgentShieldTestFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isTestOrDocFile(file)) {
+          // Downgrade test/doc findings
           for (const f of fileFindings) {
             if (f.severity === 'critical') f.severity = 'medium';
             else if (f.severity === 'high') f.severity = 'info';

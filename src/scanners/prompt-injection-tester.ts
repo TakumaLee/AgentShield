@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, tryParseJson } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -28,8 +28,16 @@ export const promptInjectionTester: ScannerModule = {
         }
 
         const fileFindings = scanContent(content, file);
-        // Downgrade test/doc findings: critical→medium, high→info
-        if (isTestOrDocFile(file)) {
+        // AgentShield's own test files: intentional attack samples → info
+        if (isAgentShieldTestFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isTestOrDocFile(file)) {
+          // Downgrade test/doc findings: critical→medium, high→info
           for (const f of fileFindings) {
             if (f.severity === 'critical') f.severity = 'medium';
             else if (f.severity === 'high') f.severity = 'info';
@@ -57,6 +65,8 @@ export const promptInjectionTester: ScannerModule = {
 export function scanContent(content: string, filePath?: string): Finding[] {
   const findings: Finding[] = [];
   const lines = content.split('\n');
+  const isConfigFile = filePath ? (isJsonFile(filePath) || isYamlFile(filePath)) : false;
+  const isSysPromptFile = filePath ? isSystemPromptFile(filePath) : false;
 
   for (const attackPattern of INJECTION_PATTERNS) {
     for (let i = 0; i < lines.length; i++) {
@@ -64,12 +74,30 @@ export function scanContent(content: string, filePath?: string): Finding[] {
         // Check for duplicates
         const existingId = `${attackPattern.id}-${filePath}-${i + 1}`;
         if (!findings.some(f => f.id === existingId)) {
+          let severity = attackPattern.severity;
+          let note = '';
+
+          // PI-088: ../../ in JSON/YAML string values is a normal relative path, not path traversal
+          if (attackPattern.id === 'PI-088' && isConfigFile) {
+            const line = lines[i].trim();
+            if (isJsonRelativePath(line)) {
+              severity = 'info';
+              note = ' [relative path in config file — not a path traversal attack]';
+            }
+          }
+
+          // System prompt/rules files: their content IS the defense, not an attack
+          if (isSysPromptFile) {
+            severity = 'info';
+            note = ' [system prompt/rules file — defensive content, not an attack vector]';
+          }
+
           findings.push({
             id: existingId,
             scanner: 'prompt-injection-tester',
-            severity: attackPattern.severity,
+            severity,
             title: `${attackPattern.category}: ${attackPattern.description}`,
-            description: `Matched pattern ${attackPattern.id} in ${attackPattern.category} category. Line: "${lines[i].trim().substring(0, 100)}"`,
+            description: `Matched pattern ${attackPattern.id} in ${attackPattern.category} category. Line: "${lines[i].trim().substring(0, 100)}"${note}`,
             file: filePath,
             line: i + 1,
             recommendation: getRecommendation(attackPattern.category),
@@ -80,6 +108,39 @@ export function scanContent(content: string, filePath?: string): Finding[] {
   }
 
   return findings;
+}
+
+/**
+ * Check if ../../ in a line is within a JSON string value (quoted).
+ * e.g. `"memory": "../../memory"` → true
+ *      `read ../../etc/passwd` → false
+ */
+function isJsonRelativePath(line: string): boolean {
+  // Pattern: key-value pair where the value contains ../../
+  return /["']\s*:\s*["'][^"']*\.\.\/\.\.\//i.test(line) ||
+         /["'][^"']*\.\.\/\.\.\/[^"']*["']/i.test(line);
+}
+
+/**
+ * Known system prompt / agent rules files. These define the AI agent's
+ * behavior and security boundaries. Injection patterns found here are
+ * defensive rules, not attack vectors.
+ */
+const SYSTEM_PROMPT_FILE_PATTERNS = [
+  /[/\\]AGENTS\.md$/i,
+  /[/\\]SOUL\.md$/i,
+  /[/\\]SYSTEM\.md$/i,
+  /[/\\]RULES\.md$/i,
+  /[/\\]GUIDELINES\.md$/i,
+  /[/\\]INSTRUCTIONS\.md$/i,
+  /[/\\]CLAUDE\.md$/i,
+  /[/\\]\.cursorrules$/i,
+  /[/\\]copilot-instructions\.md$/i,
+  /[/\\]system[_-]?prompt/i,
+];
+
+export function isSystemPromptFile(filePath: string): boolean {
+  return SYSTEM_PROMPT_FILE_PATTERNS.some(p => p.test(filePath));
 }
 
 /**

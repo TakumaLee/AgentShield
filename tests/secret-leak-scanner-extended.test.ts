@@ -75,19 +75,19 @@ describe('Secret Leak Scanner — Extended Coverage', () => {
   test('downgrades findings in example files', () => {
     const findings = scanForSecrets('password = "realpassword123"', '/project/.env.example');
     expect(findings.length).toBeGreaterThan(0);
-    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].severity).toBe('info');
   });
 
   test('downgrades findings in sample files', () => {
     const findings = scanForSecrets('api_key = "sk-realkeyvalue1234567890"', '/project/config.sample');
     expect(findings.length).toBeGreaterThan(0);
-    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].severity).toBe('info');
   });
 
   test('downgrades findings in docker-compose files', () => {
     const findings = scanForSecrets('password = "realpassword123"', '/project/docker-compose.yml');
     expect(findings.length).toBeGreaterThan(0);
-    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].severity).toBe('info');
   });
 
   // === Sensitive path detection ===

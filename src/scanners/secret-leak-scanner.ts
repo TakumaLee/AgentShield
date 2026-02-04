@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 
 export const secretLeakScanner: ScannerModule = {
@@ -31,8 +31,16 @@ export const secretLeakScanner: ScannerModule = {
           }
         }
 
-        // Downgrade test/doc findings
-        if (isTestOrDocFile(file)) {
+        // AgentShield's own test files: intentional attack samples → info
+        if (isAgentShieldTestFile(file)) {
+          for (const f of fileFindings) {
+            if (f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [security tool test file — intentional attack sample]';
+            }
+          }
+        } else if (isTestOrDocFile(file)) {
+          // Downgrade test/doc findings
           for (const f of fileFindings) {
             if (f.severity === 'critical') f.severity = 'medium';
             else if (f.severity === 'high') f.severity = 'info';
@@ -79,8 +87,8 @@ export function scanForSecrets(content: string, filePath?: string): Finding[] {
           severity = 'medium';
           note = ' [common dev value — likely not a real secret]';
         } else if (filePath && isExampleFile(filePath)) {
-          severity = 'medium';
-          note = ' [example/template file]';
+          severity = 'info';
+          note = ' [example/template file — not real secrets]';
         }
 
         findings.push({
@@ -109,21 +117,88 @@ export function scanForSensitivePaths(content: string, filePath?: string): Findi
   for (let i = 0; i < lines.length; i++) {
     for (const pathPattern of SENSITIVE_PATH_PATTERNS) {
       if (pathPattern.pattern.test(lines[i])) {
+        // For SP-003 (.env): downgrade prose mentions to info
+        let severity: 'critical' | 'high' | 'medium' | 'info' = 'high';
+        let note = '';
+        if (pathPattern.id === 'SP-003') {
+          // Check if this is a prose/doc mention vs actual file reference
+          const line = lines[i];
+          const isProseContext = isEnvProseMention(line);
+          if (isProseContext) {
+            severity = 'info';
+            note = ' [textual mention of .env — not a file path reference]';
+          }
+        }
+
+        // Downgrade example/template env files
+        if (filePath && isEnvExampleFile(filePath)) {
+          severity = 'info';
+          note = ' [example/template env file — not real secrets]';
+        }
+
         findings.push({
           id: `${pathPattern.id}-${filePath}-${i + 1}`,
           scanner: 'secret-leak-scanner',
-          severity: 'high',
+          severity,
           title: `Sensitive path reference: ${pathPattern.description}`,
-          description: `Found reference to sensitive path at line ${i + 1}: "${lines[i].trim().substring(0, 100)}"`,
+          description: `Found reference to sensitive path at line ${i + 1}: "${lines[i].trim().substring(0, 100)}"${note}`,
           file: filePath,
           line: i + 1,
-          recommendation: 'Avoid referencing sensitive system paths in prompts or tool definitions. These paths can be used for social engineering attacks.',
+          recommendation: severity === 'info'
+            ? 'This appears to be a documentation reference or example file. Verify no real secrets are exposed.'
+            : 'Avoid referencing sensitive system paths in prompts or tool definitions. These paths can be used for social engineering attacks.',
         });
       }
     }
   }
 
   return findings;
+}
+
+/**
+ * Check if a line is a prose/documentation mention of .env rather than an actual file path reference.
+ * Prose indicators: surrounded by explanatory text, in comments, in markdown, etc.
+ */
+function isEnvProseMention(line: string): boolean {
+  const lower = line.toLowerCase().trim();
+  // Prose patterns: explaining what .env is, mentioning it in documentation context
+  const proseIndicators = [
+    /copy\s+.*\.env/i,
+    /create\s+.*\.env/i,
+    /rename\s+.*\.env/i,
+    /fill\s+in/i,
+    /add\s+your/i,
+    /set\s+up/i,
+    /configure/i,
+    /see\s+.*\.env/i,
+    /refer\s+to/i,
+    /check\s+(the\s+)?\.env/i,
+    /store[sd]?\s+in\s+.*\.env/i,
+    /use\s+.*\.env/i,
+    /loaded?\s+from\s+.*\.env/i,
+    /variable/i,
+    /environment/i,
+    /^[\s*#/-]/,  // Starts with comment/list markers
+  ];
+  // If line is short and just a path, it's a reference not prose
+  if (/^\s*\.env\s*$/.test(line)) return false;
+  // If it has prose indicators, it's a documentation mention
+  return proseIndicators.some(p => p.test(lower));
+}
+
+/**
+ * Check if file is a .env example/template that shouldn't contain real secrets.
+ */
+function isEnvExampleFile(filePath: string): boolean {
+  const ENV_EXAMPLE_PATTERNS = [
+    /\.env\.example$/i,
+    /\.env\.template$/i,
+    /\.env\.sample$/i,
+    /\.env\.dev$/i,
+    /\.env\.staging$/i,
+    /\.env\.dist$/i,
+  ];
+  return ENV_EXAMPLE_PATTERNS.some(p => p.test(filePath));
 }
 
 export function scanForHardcodedCredentials(content: string, filePath?: string): Finding[] {

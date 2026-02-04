@@ -225,7 +225,7 @@ describe('Skill Auditor — framework context downgrades', () => {
     const appShellFindings = appResult.findings.filter(f => f.id.startsWith('SA-003d'));
 
     for (const f of appShellFindings) {
-      expect(f.severity).toBe('medium'); // NOT downgraded
+      expect(f.severity).toBe('info'); // App context: SA-003d downgraded (shell exec is normal for agent tools)
     }
   });
 
@@ -333,9 +333,9 @@ describe('--context flag integration', () => {
     const skShell = sk.findings.filter(f => f.id.startsWith('SA-003d'));
     expect(skShell.every(f => f.severity === 'medium')).toBe(true);
 
-    // app context (default, no downgrades)
+    // app context (default, SA-003d downgraded to info for app context)
     const ap = await skillAuditor.scan(tmpDir, { context: 'app' });
     const apShell = ap.findings.filter(f => f.id.startsWith('SA-003d'));
-    expect(apShell.every(f => f.severity === 'medium')).toBe(true);
+    expect(apShell.every(f => f.severity === 'info')).toBe(true);
   });
 });

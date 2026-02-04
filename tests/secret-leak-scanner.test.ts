@@ -71,7 +71,8 @@ describe('Secret Leak Scanner', () => {
   });
 
   test('detects .env file reference', () => {
-    const findings = scanForSensitivePaths('Check the .env file for config');
+    // Use an actual file path reference, not a prose mention
+    const findings = scanForSensitivePaths("require('dotenv').config()");
     expect(findings.length).toBeGreaterThan(0);
   });
 

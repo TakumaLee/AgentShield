@@ -1056,7 +1056,7 @@ export const SECRET_PATTERNS = [
 export const SENSITIVE_PATH_PATTERNS = [
   { id: 'SP-001', pattern: /\/etc\/passwd|\/etc\/shadow/i, description: 'Unix system file path' },
   { id: 'SP-002', pattern: /~\/\.ssh\/|\.ssh\/id_rsa|\.ssh\/authorized_keys/i, description: 'SSH key path' },
-  { id: 'SP-003', pattern: /(?<!process)\.env\b(?!\w)|\.env\.local|\.env\.production/i, description: '.env file reference' },
+  { id: 'SP-003', pattern: /(?:^|[/\\)\s'"`])\.env(?:\.local|\.production|\.staging|\.development|\.test)(?:\b|$)|(?:require|import|load|read|cat|source|cp|mv|rm)\b[^;\n]{0,30}\.env\b|dotenv/i, description: '.env file reference (path/import)' },
   { id: 'SP-004', pattern: /\/root\/|C:\\Users\\Administrator/i, description: 'Root/admin home directory' },
   { id: 'SP-005', pattern: /\.aws\/credentials|\.aws\/config/i, description: 'AWS credentials path' },
   { id: 'SP-006', pattern: /\.kube\/config/i, description: 'Kubernetes config path' },

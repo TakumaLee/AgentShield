@@ -155,7 +155,10 @@ describe('Scanner Integration Tests — scan() methods', () => {
       for (const finding of result.findings) {
         if (finding.file && finding.file.includes('tests/')) {
           expect(finding.severity).not.toBe('critical');
-          expect(finding.description).toContain('test/doc file');
+          // May be tagged as test/doc file or security tool test file
+          const hasTestTag = finding.description.includes('test/doc file') ||
+                             finding.description.includes('security tool test file');
+          expect(hasTestTag).toBe(true);
         }
       }
     });
