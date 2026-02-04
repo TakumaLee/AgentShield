@@ -37,8 +37,8 @@ describe('Scorer', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // 100 - 20*log2(2) = 100 - 20 = 80
-    expect(summary.score).toBe(80);
+    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
+    expect(summary.score).toBe(92);
     expect(summary.critical).toBe(1);
   });
 
@@ -48,9 +48,9 @@ describe('Scorer', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings, scannedFiles: 1, duration: 50,
     }]);
-    // Critical max penalty is 50, so score = 50
-    expect(summary.score).toBe(50);
-    expect(summary.grade).toBe('F');
+    // codeSafety=50, weighted: 50×0.4+100×0.3+100×0.3=80
+    expect(summary.score).toBe(80);
+    expect(summary.grade).toBe('B-');
   });
 
   test('F grade requires multiple severity types maxed out', () => {
@@ -63,9 +63,9 @@ describe('Scorer', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings: [...criticals, ...highs, ...mediums], scannedFiles: 1, duration: 50,
     }]);
-    // 50 + 30 + 15 + interaction(20, 50) = 50+30+15+10 = 105 → clamped to 0
-    expect(summary.grade).toBe('F');
-    expect(summary.score).toBeLessThan(60);
+    // codeSafety≈2 (all penalties near max), weighted: ~2×0.4+100×0.3+100×0.3≈61
+    expect(summary.score).toBeLessThan(65);
+    expect(summary.score).toBeGreaterThanOrEqual(60);
   });
 
   test('scoreToGrade covers all ranges', () => {
@@ -151,8 +151,8 @@ describe('Interaction Penalty', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // 100 - 20*log2(2) - 5*log2(2) - 5*log2(2) = 100 - 20 - 5 - 5 = 70
-    expect(summary.score).toBe(70);
+    // codeSafety=70, weighted: 70×0.4+100×0.3+100×0.3=88
+    expect(summary.score).toBe(88);
   });
 });
 
@@ -165,8 +165,8 @@ describe('Confidence Weighting', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // 100 - 20*log2(2) = 80
-    expect(summary.score).toBe(80);
+    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
+    expect(summary.score).toBe(92);
   });
 
   test('possible findings have reduced weight', () => {
@@ -184,8 +184,9 @@ describe('Confidence Weighting', () => {
     }];
     const summary = calculateSummary(results);
     const expectedPenalty = 5 * Math.log2(1.8 + 1);
-    const expectedScore = Math.round(100 - expectedPenalty);
-    expect(summary.score).toBe(expectedScore);
+    const dimScore = Math.round(100 - expectedPenalty);
+    // weighted: dimScore×0.4+100×0.3+100×0.3
+    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
   });
 
   test('likely findings have 0.8 weight', () => {
@@ -200,8 +201,9 @@ describe('Confidence Weighting', () => {
     }];
     const summary = calculateSummary(results);
     const expectedPenalty = 20 * Math.log2(4.0 + 1);
-    const expectedScore = Math.round(100 - expectedPenalty);
-    expect(summary.score).toBe(expectedScore);
+    const dimScore = Math.round(100 - expectedPenalty);
+    // weighted: dimScore×0.4+100×0.3+100×0.3
+    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
   });
 
   test('findings without confidence default to definite', () => {
@@ -212,8 +214,8 @@ describe('Confidence Weighting', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // Same as definite: 100 - 20 = 80
-    expect(summary.score).toBe(80);
+    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
+    expect(summary.score).toBe(92);
   });
 
   test('mixed confidence is weighted correctly', () => {
@@ -230,8 +232,9 @@ describe('Confidence Weighting', () => {
     }];
     const summary = calculateSummary(results);
     const expectedPenalty = 20 * Math.log2(1.6 + 1);
-    const expectedScore = Math.round(100 - expectedPenalty);
-    expect(summary.score).toBe(expectedScore);
+    const dimScore = Math.round(100 - expectedPenalty);
+    // weighted: dimScore×0.4+100×0.3+100×0.3
+    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
   });
 });
 
@@ -309,9 +312,9 @@ describe('Three-Dimension Scoring', () => {
       },
     ];
     const summary = calculateSummary(results);
-    // Code safety is bad, config is perfect.
-    // Overall should be pulled down by weakest dimension
-    expect(summary.score).toBeLessThanOrEqual(summary.dimensions!.codeSafety.score);
+    // Code safety is bad (50), config is perfect.
+    // Weighted avg: 50×0.4+100×0.3+100×0.3=80
+    expect(summary.score).toBe(80);
   });
 
   test('dimension grades are correctly assigned', () => {
@@ -398,9 +401,9 @@ describe('Edge Cases', () => {
     const summary = calculateSummary([{
       scanner: 'test', findings, scannedFiles: 1, duration: 50,
     }]);
-    // max penalty: 50 + 30 + 15 + 10 (interaction) = 105, clamped to 0
-    expect(summary.score).toBe(0);
-    expect(summary.grade).toBe('F');
+    // codeSafety=0, weighted: 0×0.4+100×0.3+100×0.3=60
+    expect(summary.score).toBe(60);
+    expect(summary.grade).toBe('D-');
   });
 
   test('empty results array', () => {

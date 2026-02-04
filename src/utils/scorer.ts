@@ -147,18 +147,25 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
     defenseScore: buildDimensionScore(dimensionFindings.defenseScore),
   };
 
-  // Overall grade uses min of dimension scores (weakest-link principle)
-  const hasAnyDimensionFindings = allFindings.length > 0 &&
-    Object.values(dimensionFindings).some(f => f.length > 0);
+  // Overall grade uses weighted average of dimension scores
+  // Code Safety 40% (direct attack surface: secrets, injection)
+  // Config Safety 30% (MCP, permissions, channels)
+  // Defense Score 30% (defense layers, red team resilience)
+  const DIMENSION_WEIGHTS = { codeSafety: 0.4, configSafety: 0.3, defenseScore: 0.3 };
 
   let finalScore = score;
   let finalGrade = grade;
 
+  const hasAnyDimensionFindings = allFindings.length > 0 &&
+    Object.values(dimensionFindings).some(f => f.length > 0);
+
   if (hasAnyDimensionFindings) {
-    const dimScores = [dimensions.codeSafety.score, dimensions.configSafety.score, dimensions.defenseScore.score];
-    const minDimScore = Math.min(...dimScores);
-    // Use the lower of overall penalty-based score or weakest dimension
-    finalScore = Math.min(score, minDimScore);
+    const weightedScore = Math.round(
+      dimensions.codeSafety.score * DIMENSION_WEIGHTS.codeSafety +
+      dimensions.configSafety.score * DIMENSION_WEIGHTS.configSafety +
+      dimensions.defenseScore.score * DIMENSION_WEIGHTS.defenseScore
+    );
+    finalScore = weightedScore;
     finalGrade = scoreToGrade(finalScore);
   }
 
