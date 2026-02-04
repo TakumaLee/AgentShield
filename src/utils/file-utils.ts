@@ -10,6 +10,42 @@ export function fileExists(filePath: string): boolean {
   return fs.existsSync(filePath);
 }
 
+const DEFAULT_IGNORE = [
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/build/**',
+  '**/.git/**',
+  '**/.dart_tool/**',
+  '**/.flutter-plugins*',
+  '**/Pods/**',
+  '**/.gradle/**',
+  '**/vendor/**',
+  '**/__pycache__/**',
+  '**/venv/**',
+  '**/.venv/**',
+  '**/coverage/**',
+  '**/*.min.js',
+  '**/*.min.css',
+  '**/*.map',
+  '**/package-lock.json',
+  '**/yarn.lock',
+  '**/pnpm-lock.yaml',
+  '**/*.lock',
+  '**/*.freezed.dart',
+  '**/*.g.dart',
+  '**/*.pb.dart',
+  '**/*.mocks.dart',
+  '**/ios/Pods/**',
+  '**/android/.gradle/**',
+  '**/.next/**',
+  '**/.nuxt/**',
+  '**/.cache/**',
+  '**/tmp/**',
+];
+
+// Max file size to scan (256KB) — skip binary/large generated files
+const MAX_FILE_SIZE = 256 * 1024;
+
 export async function findFiles(targetPath: string, patterns: string[]): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
@@ -19,12 +55,21 @@ export async function findFiles(targetPath: string, patterns: string[]): Promise
       cwd: absTarget,
       absolute: true,
       nodir: true,
-      ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+      ignore: DEFAULT_IGNORE,
     });
     results.push(...files);
   }
 
-  return [...new Set(results)];
+  // Deduplicate and filter out oversized files
+  const unique = [...new Set(results)];
+  return unique.filter(f => {
+    try {
+      const stat = fs.statSync(f);
+      return stat.size <= MAX_FILE_SIZE;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export async function findConfigFiles(targetPath: string): Promise<string[]> {
