@@ -327,7 +327,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
   {
     id: 'PI-045',
     category: 'encoding',
-    pattern: /\beval\s*\(|exec\s*\(|Function\s*\(/,
+    pattern: /(?<!\bclass\s)\beval\s*\(|(?<!\bclass\s)\bexec\s*\(|(?<!\bclass\s)(?<!\bdef\s)new\s+Function\s*\(/,
     severity: 'critical',
     description: 'Code execution function in prompt',
   },
@@ -431,7 +431,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
   {
     id: 'PI-059',
     category: 'advanced',
-    pattern: /\btool_call\b|\bfunction_call\b|\btool_use\b/i,
+    pattern: /(?:call|invoke|execute|run)\s+(?:tool|function)\s+['"][^'"]+['"]/i,
     severity: 'high',
     description: 'Tool/function call injection in user input',
   },

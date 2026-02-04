@@ -41,6 +41,7 @@ const DEFAULT_IGNORE = [
   '**/.nuxt/**',
   '**/.cache/**',
   '**/tmp/**',
+  '**/agentshield-report*.json',
 ];
 
 // Files that are likely test/doc context — findings here get severity downgraded
@@ -109,10 +110,31 @@ export async function findConfigFiles(targetPath: string): Promise<string[]> {
 }
 
 export async function findPromptFiles(targetPath: string): Promise<string[]> {
-  return findFiles(targetPath, [
+  // Tier 1: High-signal agent/prompt files (always scan)
+  const agentFiles = await findFiles(targetPath, [
     '**/*prompt*',
     '**/*system*',
     '**/*instruction*',
+    '**/*agent*',
+    '**/*mcp*',
+    '**/*tool*',
+    '**/SOUL.md',
+    '**/AGENTS.md',
+    '**/CLAUDE.md',
+    '**/claude_desktop_config.json',
+    '**/.cursorrules',
+    '**/.github/copilot*',
+    '**/*config*.json',
+    '**/*config*.yaml',
+    '**/*config*.yml',
+    '**/*settings*.json',
+    '**/*settings*.yaml',
+    '**/.env*',
+  ]);
+
+  // Tier 2: General files but only in small projects (< 200 files)
+  // For large projects, only scan agent-specific files
+  const allSourceFiles = await findFiles(targetPath, [
     '**/*.md',
     '**/*.txt',
     '**/*.json',
@@ -122,6 +144,14 @@ export async function findPromptFiles(targetPath: string): Promise<string[]> {
     '**/*.js',
     '**/*.py',
   ]);
+
+  // If project is large, only use Tier 1 files
+  if (allSourceFiles.length > 200) {
+    return agentFiles;
+  }
+
+  // Small project: scan everything
+  return [...new Set([...agentFiles, ...allSourceFiles])];
 }
 
 export function isJsonFile(filePath: string): boolean {

@@ -25,6 +25,12 @@ export const permissionAnalyzer: ScannerModule = {
       /jest\.config/,
       /vite\.config/,
       /webpack\.config/,
+      /release-please/,
+      /renovate/,
+      /dependabot/,
+      /\.github\//,
+      /firebase\.json$/,
+      /firestore\.indexes\.json$/,
     ];
 
     for (const file of allFiles) {
