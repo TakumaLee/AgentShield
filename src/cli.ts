@@ -124,7 +124,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
 
   // Build report
   const report: ScanReport = {
-    version: '0.1.0',
+    version: '0.2.0',
     timestamp: new Date().toISOString(),
     target: absPath,
     results,
