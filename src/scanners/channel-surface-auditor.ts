@@ -35,6 +35,11 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       /\bmail\.google\b/i,
       /\bsendEmail\b/i,
       /\breadEmail\b/i,
+      /\bmailgun\b/i,
+      /\bsendgrid\b/i,
+      /\b(?:aws[_-]?)?ses\b/i,
+      /\bnodemailer\b/i,
+      /\bpostmark\b/i,
     ],
     defensePatterns: [
       { pattern: /(?:外部|external)\s*(?:email|mail).*(?:純文字|plain\s*text)/i, desc: 'treat external email as plain text' },
@@ -139,6 +144,8 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
       { pattern: /(?:不|do\s*not|never).*(?:表單|form).*(?:輸入|input|enter).*(?:credentials?|密碼|password)/i, desc: 'no credential entry in forms' },
       { pattern: /(?:url|domain).*(?:allowlist|whitelist|blocklist)/i, desc: 'URL allowlist/blocklist' },
       { pattern: /(?:browser|瀏覽器).*(?:sandbox|沙箱|restriction|限制)/i, desc: 'browser sandbox restrictions' },
+      { pattern: /(?:cookie|session|localStorage).*(?:protect|restrict|isolat|sanitiz|不|禁止)/i, desc: 'cookie/session protection' },
+      { pattern: /(?:不|do\s*not|never).*(?:存取|access|read|use).*(?:cookie|session|localStorage)/i, desc: 'no cookie/session access' },
     ],
     partialThreshold: 1,
     fullThreshold: 2,
@@ -211,6 +218,25 @@ const CHANNEL_DEFINITIONS: ChannelDefinition[] = [
     ],
     partialThreshold: 1,
     fullThreshold: 2,
+  },
+  {
+    id: 'CH-MCP',
+    name: 'MCP Server (tool channel)',
+    detectPatterns: [
+      /\bmcp[_-]?server/i,
+      /\bmcpServers\b/i,
+      /\bmcp_servers\b/i,
+      /\bmodel[_-]?context[_-]?protocol/i,
+    ],
+    defensePatterns: [
+      { pattern: /(?:tool|mcp)\s+(?:output|response|result).*(?:sanitiz|filter|validat|treat.*(?:untrusted|plain\s*text))/i, desc: 'MCP tool output sanitization' },
+      { pattern: /(?:不|do\s*not|never).*(?:執行|execute|follow|trust).*(?:tool|mcp).*(?:輸出|output|response|result).*(?:中的)?(?:指令|instruction|command)/i, desc: 'do not execute tool output instructions' },
+      { pattern: /(?:tool|mcp).*(?:allowlist|whitelist|allow[_-]?tool)/i, desc: 'MCP tool allowlist' },
+      { pattern: /(?:verify|驗證|validate).*(?:tool|mcp).*(?:description|output|response)/i, desc: 'verify MCP tool descriptions/output' },
+      { pattern: /(?:tool|mcp).*(?:sandbox|isolat|restrict|boundary)/i, desc: 'MCP tool sandboxing' },
+    ],
+    partialThreshold: 1,
+    fullThreshold: 3,
   },
   {
     id: 'CH-PAYMENT',
@@ -324,6 +350,7 @@ function getChannelRecommendation(channelId: string): string {
     'CH-FILESYSTEM': 'Use trash instead of rm. Do not execute untrusted scripts. Require confirmation for destructive commands.',
     'CH-API': 'Validate URLs/domains. Implement rate limiting. Use proper authentication.',
     'CH-DATABASE': 'Use parameterized queries. Sanitize all inputs. Implement access controls.',
+    'CH-MCP': 'Treat MCP tool outputs as untrusted data. Never execute instructions found in tool responses. Use tool allowlists. Verify tool descriptions. Sandbox MCP server access.',
     'CH-PAYMENT': 'Require explicit confirmation for all payment operations. Set spending limits.',
   };
   return recommendations[channelId] || '';

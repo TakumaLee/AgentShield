@@ -217,7 +217,7 @@ export function analyzePermissions(config: Record<string, unknown>, filePath?: s
 
   // Check for missing rate limits
   if (configStr.includes('tool') || configStr.includes('function') || configStr.includes('api')) {
-    if (!configStr.includes('rate') && !configStr.includes('limit') && !configStr.includes('throttle') && !configStr.includes('quota')) {
+    if (!configStr.includes('rate') && !configStr.includes('limit') && !configStr.includes('throttle') && !configStr.includes('quota') && !configStr.includes('maxconcurrency') && !configStr.includes('requestsperminute')) {
       findings.push({
         id: `PERM-NORATE-${filePath}`,
         scanner: 'permission-analyzer',
@@ -232,7 +232,7 @@ export function analyzePermissions(config: Record<string, unknown>, filePath?: s
 
   // Check for missing auth configuration
   if (configStr.includes('server') || configStr.includes('endpoint') || configStr.includes('api')) {
-    if (!configStr.includes('auth') && !configStr.includes('token') && !configStr.includes('key') && !configStr.includes('credential')) {
+    if (!configStr.includes('auth') && !configStr.includes('token') && !configStr.includes('key') && !configStr.includes('credential') && !configStr.includes('cert') && !configStr.includes('oauth') && !configStr.includes('mtls') && !configStr.includes('clientid') && !configStr.includes('client_id')) {
       findings.push({
         id: `PERM-NOAUTH-${filePath}`,
         scanner: 'permission-analyzer',
@@ -502,6 +502,13 @@ export function analyzeTextPermissions(content: string, filePath?: string): Find
     { pattern: /no\s+restrictions?\s+on\s+(what|which|where)\s+you\s+can/i, desc: 'Explicit no-restriction statement in prompt' },
     { pattern: /you\s+(may|can)\s+execute\s+any\s+(command|code|script)/i, desc: 'Unrestricted code execution grant' },
     { pattern: /access\s+to\s+all\s+(user|customer|private)\s+data/i, desc: 'Unrestricted PII/data access grant' },
+    // Chinese permission patterns
+    { pattern: /你(?:可以|能夠|有權)(?:存取|讀取|寫入|刪除|修改)(?:所有|任何|全部)(?:檔案|資料|文件)/, desc: 'Chinese: unrestricted file access grant' },
+    { pattern: /(?:完全|無限制)(?:的)?(?:存取|訪問|權限)/, desc: 'Chinese: full/unrestricted access' },
+    { pattern: /沒有(?:任何)?(?:限制|約束|管控).*(?:執行|存取|操作)/, desc: 'Chinese: no restrictions on execution' },
+    // Japanese permission patterns
+    { pattern: /(?:全ての|すべての)(?:ファイル|データ|情報)に(?:アクセス|読み取り|書き込み)(?:できる|可能|許可)/, desc: 'Japanese: unrestricted data access grant' },
+    { pattern: /(?:制限なし|制約なし|無制限)(?:で|に)(?:実行|アクセス|操作)/, desc: 'Japanese: unrestricted execution/access' },
   ];
 
   for (let i = 0; i < lines.length; i++) {

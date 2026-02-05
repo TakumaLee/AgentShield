@@ -218,15 +218,15 @@ describe('Defense Analyzer', () => {
 
   // === General behavior ===
   describe('General', () => {
-    test('analyzeDefenses returns results for all 6 categories', () => {
+    test('analyzeDefenses returns results for all 7 categories', () => {
       const results = analyzeDefenses('empty content', 'test.ts');
-      expect(results.length).toBe(6);
+      expect(results.length).toBe(7);
     });
 
     test('generateDefenseFindings reports all missing when empty map', () => {
       const map = new Map<string, { totalWeight: number; matchedPatterns: string[]; files: string[] }>();
       const findings = generateDefenseFindings(map, '/test');
-      expect(findings.length).toBe(6);
+      expect(findings.length).toBe(7);
       expect(findings.every(f => f.id.endsWith('-MISSING'))).toBe(true);
     });
 

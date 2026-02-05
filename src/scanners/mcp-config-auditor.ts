@@ -77,6 +77,9 @@ export function auditConfig(config: Record<string, unknown>, filePath?: string):
     for (const [serverName, serverConfig] of Object.entries(mcpServers)) {
       findings.push(...auditServer(serverName, serverConfig, filePath));
     }
+
+    // Chain attack detection: analyze combinations of servers
+    findings.push(...auditServerChainAttacks(mcpServers, filePath));
   }
 
   // Also check top-level for tool configs
@@ -87,6 +90,9 @@ export function auditConfig(config: Record<string, unknown>, filePath?: string):
   // Check for environment variable exposure
   findings.push(...auditEnvVars(config, filePath));
 
+  // Tool description poisoning detection
+  findings.push(...auditToolDescriptionPoisoning(config, filePath));
+
   return findings;
 }
 
@@ -95,7 +101,7 @@ function auditServer(name: string, server: McpServerEntry, filePath?: string): F
 
   // Check command for dangerous executables
   if (server.command) {
-    const dangerousCmds = ['bash', 'cmd', 'powershell', 'python', 'node', '/bin/sh', '/bin/zsh'];
+    const dangerousCmds = ['bash', 'cmd', 'powershell', 'python', 'node', '/bin/sh', '/bin/zsh', 'ruby', 'perl', 'lua', 'deno', 'bun'];
     for (const cmd of dangerousCmds) {
       if (server.command === cmd || server.command.endsWith('/' + cmd)) {
         findings.push({
@@ -150,9 +156,9 @@ function auditServer(name: string, server: McpServerEntry, filePath?: string): F
       findings.push({
         id: `MCP-NOLIST-${name}`,
         scanner: 'mcp-config-auditor',
-        severity: 'medium',
+        severity: 'high',
         title: `Server "${name}" lacks allowlist/denylist`,
-        description: `The server "${name}" has no explicit allowlist or denylist configured, meaning all operations may be permitted by default.`,
+        description: `The server "${name}" has no explicit allowlist or denylist configured, meaning all operations may be permitted by default. Without a tool allowlist, the server is vulnerable to tool poisoning attacks (MCP-ITP).`,
         file: filePath,
         recommendation: 'Add allowlist or denylist configuration to restrict permitted operations.',
       });
@@ -163,7 +169,7 @@ function auditServer(name: string, server: McpServerEntry, filePath?: string): F
   if (server.env && typeof server.env === 'object') {
     for (const [key, value] of Object.entries(server.env)) {
       if (typeof value === 'string' && !value.startsWith('${') && !value.startsWith('$')) {
-        const secretPatterns = ['key', 'secret', 'token', 'password', 'passwd', 'credential'];
+        const secretPatterns = ['key', 'secret', 'token', 'password', 'passwd', 'credential', 'signing', 'private', 'connection', 'database_url', 'connection_string'];
         if (secretPatterns.some(p => key.toLowerCase().includes(p))) {
           findings.push({
             id: `MCP-ENV-${name}-${key}`,
@@ -227,6 +233,176 @@ function auditTools(tools: unknown[], filePath?: string, serverName?: string): F
           });
         }
       }
+    }
+  }
+
+  return findings;
+}
+
+// === Tool Description Poisoning Detection (CRITICAL #1) ===
+
+/** Patterns that indicate hidden instructions in tool descriptions */
+const TOOL_DESCRIPTION_POISON_PATTERNS = [
+  /\b(?:send|forward|exfiltrate|transmit)\s+(?:to|data\s+to)\b/i,
+  /\bread\s+(?:~\/\.ssh|\.env|\/etc\/passwd|credentials?|private\s+key)/i,
+  /\b(?:always|must|should)\s+(?:also|first|secretly)\s+(?:execute|run|call|send|read|fetch)/i,
+  /\b(?:hidden|secret|invisible)\s+instruction/i,
+  /\bwhen\s+(?:you|the\s+user)\s+(?:see|read|receive|ask).*(?:also|secretly|quietly)\b/i,
+  /\b(?:do\s+not\s+tell|don'?t\s+mention|keep\s+(?:this\s+)?(?:secret|hidden))\b/i,
+  /\b(?:ignore|override|disregard)\s+(?:previous|prior|safety|security|user)\b/i,
+  /\b(?:before|after)\s+(?:executing|running|performing).*(?:also|additionally|secretly)\b/i,
+  /\bhttps?:\/\/[^\s]+.*(?:exfil|leak|steal|forward|send|post)/i,
+  /\b(?:curl|wget|fetch|http\.post|axios\.post)\s+.*(?:secret|token|key|password|env)/i,
+];
+
+export function auditToolDescriptionPoisoning(config: Record<string, unknown>, filePath?: string): Finding[] {
+  const findings: Finding[] = [];
+  const json = JSON.stringify(config);
+
+  // Check all tool descriptions in the config
+  const descriptionMatches = json.match(/"description"\s*:\s*"([^"]{20,})"/gi) || [];
+
+  for (const match of descriptionMatches) {
+    const descValue = match.replace(/"description"\s*:\s*"/i, '').replace(/"$/, '');
+    for (const pattern of TOOL_DESCRIPTION_POISON_PATTERNS) {
+      if (pattern.test(descValue)) {
+        findings.push({
+          id: `MCP-POISON-DESC`,
+          scanner: 'mcp-config-auditor',
+          severity: 'critical',
+          title: 'Suspicious tool description: potential poisoning',
+          description: `A tool description contains suspicious patterns that may indicate tool description poisoning: "${descValue.substring(0, 120)}..."`,
+          file: filePath,
+          recommendation: 'Review all MCP tool descriptions carefully. Tool descriptions should only describe functionality, not contain hidden instructions. See MCP-ITP research for attack details.',
+        });
+        break; // One finding per description is enough
+      }
+    }
+  }
+
+  return findings;
+}
+
+// === MCP Server Chain Attack Detection (CRITICAL #2) ===
+
+/** Server capability categories based on command/name/args */
+function classifyServerCapabilities(name: string, server: McpServerEntry): Set<string> {
+  const caps = new Set<string>();
+  const lowerName = name.toLowerCase();
+  const cmd = (server.command || '').toLowerCase();
+  const argsStr = (server.args || []).join(' ').toLowerCase();
+  const combined = `${lowerName} ${cmd} ${argsStr}`;
+
+  if (/filesystem|file[_-]?system|fs[_-]?server|file[_-]?(?:read|write|access)|directory/i.test(combined)) {
+    caps.add('filesystem');
+  }
+  if (/\bgit\b|github|gitlab|bitbucket/i.test(combined)) {
+    caps.add('git');
+  }
+  if (/\b(?:web[_-]?fetch|browser|puppeteer|playwright|selenium|chromium|http[_-]?client|web[_-]?scrape)/i.test(combined)) {
+    caps.add('web');
+  }
+  if (/\b(?:bash|sh|zsh|cmd|powershell|exec|shell|terminal|subprocess|child_process)\b/i.test(combined)) {
+    caps.add('exec');
+  }
+  if (/\b(?:http|https|webhook|email|smtp|sendgrid|mailgun|ses|fetch|request|network|api[_-]?client)\b/i.test(combined)) {
+    caps.add('network');
+  }
+  if (/\b(?:search|brave|google|bing|duckduckgo|serpapi)\b/i.test(combined)) {
+    caps.add('web');
+  }
+
+  return caps;
+}
+
+function hasPathRestriction(server: McpServerEntry): boolean {
+  const argsStr = (server.args || []).join(' ');
+  return /--allow[_-]?dir|--root[_-]?dir|--allowed[_-]?path|--sandbox|--restrict/i.test(argsStr) ||
+    !!(server.allowedPaths || (server as Record<string, unknown>).rootDir || (server as Record<string, unknown>).sandboxPath);
+}
+
+export function auditServerChainAttacks(servers: Record<string, McpServerEntry>, filePath?: string): Finding[] {
+  const findings: Finding[] = [];
+  const serverCaps = new Map<string, Set<string>>();
+
+  for (const [name, server] of Object.entries(servers)) {
+    serverCaps.set(name, classifyServerCapabilities(name, server));
+  }
+
+  // Collect all capabilities across all servers
+  const allCaps = new Set<string>();
+  for (const caps of serverCaps.values()) {
+    for (const c of caps) allCaps.add(c);
+  }
+
+  // Rule 1: exec/shell + network → CRITICAL
+  if (allCaps.has('exec') && allCaps.has('network')) {
+    const execServers = [...serverCaps.entries()].filter(([, c]) => c.has('exec')).map(([n]) => n);
+    const netServers = [...serverCaps.entries()].filter(([, c]) => c.has('network')).map(([n]) => n);
+    findings.push({
+      id: 'MCP-CHAIN-EXEC-NET',
+      scanner: 'mcp-config-auditor',
+      severity: 'critical',
+      title: 'MCP chain attack risk: exec + network servers',
+      description: `Servers with exec/shell capability (${execServers.join(', ')}) coexist with network-capable servers (${netServers.join(', ')}). A compromised server could execute arbitrary code and exfiltrate data via the network server.`,
+      file: filePath,
+      recommendation: 'Avoid combining exec/shell servers with network-capable servers. If necessary, enforce strict sandboxing on exec servers and network allowlists.',
+    });
+  }
+
+  // Rule 2: filesystem + git → HIGH
+  if (allCaps.has('filesystem') && allCaps.has('git')) {
+    const fsServers = [...serverCaps.entries()].filter(([, c]) => c.has('filesystem')).map(([n]) => n);
+    const gitServers = [...serverCaps.entries()].filter(([, c]) => c.has('git')).map(([n]) => n);
+
+    // Check if filesystem servers have path restrictions
+    const unrestricted = fsServers.filter(name => {
+      const server = servers[name];
+      return !hasPathRestriction(server);
+    });
+
+    findings.push({
+      id: 'MCP-CHAIN-FS-GIT',
+      scanner: 'mcp-config-auditor',
+      severity: 'high',
+      title: 'MCP chain attack risk: filesystem + git servers',
+      description: `Filesystem servers (${fsServers.join(', ')}) coexist with git servers (${gitServers.join(', ')}). A malicious git repository (e.g., poisoned README) could trigger prompt injection that leverages the filesystem server to read/write arbitrary files.${unrestricted.length > 0 ? ` Filesystem servers without path restrictions: ${unrestricted.join(', ')}.` : ''}`,
+      file: filePath,
+      recommendation: 'Add path restrictions to filesystem servers (--allow-dir). Review git repositories for injection payloads. See CVE-2025-68143/44/45.',
+    });
+  }
+
+  // Rule 3: filesystem + web/browser → HIGH
+  if (allCaps.has('filesystem') && allCaps.has('web')) {
+    const fsServers = [...serverCaps.entries()].filter(([, c]) => c.has('filesystem')).map(([n]) => n);
+    const webServers = [...serverCaps.entries()].filter(([, c]) => c.has('web')).map(([n]) => n);
+
+    findings.push({
+      id: 'MCP-CHAIN-FS-WEB',
+      scanner: 'mcp-config-auditor',
+      severity: 'high',
+      title: 'MCP chain attack risk: filesystem + web servers',
+      description: `Filesystem servers (${fsServers.join(', ')}) coexist with web/browser servers (${webServers.join(', ')}). Malicious web content could inject instructions that leverage the filesystem server to read or modify local files.`,
+      file: filePath,
+      recommendation: 'Add path restrictions to filesystem servers. Implement web content sanitization to strip hidden instructions from fetched content.',
+    });
+  }
+
+  // Rule 4: filesystem + network (exfiltration channel) → HIGH
+  if (allCaps.has('filesystem') && allCaps.has('network')) {
+    const fsServers = [...serverCaps.entries()].filter(([, c]) => c.has('filesystem')).map(([n]) => n);
+    const netServers = [...serverCaps.entries()].filter(([, c]) => c.has('network')).map(([n]) => n);
+    // Only fire if not already covered by exec+network
+    if (!allCaps.has('exec')) {
+      findings.push({
+        id: 'MCP-CHAIN-FS-NET',
+        scanner: 'mcp-config-auditor',
+        severity: 'high',
+        title: 'MCP exfiltration risk: filesystem + network servers',
+        description: `Filesystem servers (${fsServers.join(', ')}) coexist with network-capable servers (${netServers.join(', ')}). An attacker could read sensitive files via filesystem server and exfiltrate data via the network server.`,
+        file: filePath,
+        recommendation: 'Restrict filesystem server paths. Implement network request allowlists. Monitor for unusual file reads followed by network calls.',
+      });
     }
   }
 

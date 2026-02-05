@@ -119,6 +119,15 @@ const SKILL_PATTERNS: SkillPattern[] = [
     recommendation: 'Use explicit, auditable URLs. Dynamic URL construction can hide malicious endpoints.',
   },
   {
+    id: 'SA-004e',
+    category: 'hidden-network',
+    pattern: /(?:new\s+)?TextDecoder\s*\([\s\S]{0,100}(?:fetch|http|request|axios|url)/i,
+    severity: 'high',
+    title: 'TextDecoder near network call',
+    description: 'TextDecoder is used near network call functionality, potentially decoding obfuscated URLs or payloads.',
+    recommendation: 'Audit TextDecoder usage. Ensure decoded content is not used to construct hidden network endpoints.',
+  },
+  {
     id: 'SA-004c',
     category: 'hidden-network',
     pattern: /(?:String\.fromCharCode|\\x[0-9a-f]{2}|\\u[0-9a-f]{4})\s*[\s\S]{0,50}(?:fetch|http|request|axios)/i,

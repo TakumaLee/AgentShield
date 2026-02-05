@@ -269,6 +269,18 @@ function getRecommendation(category: string): string {
       return 'Implement proper session management and authentication. Never allow prompt-based identity changes or privilege escalation.';
     case 'tool-injection':
       return 'Validate tool descriptions and outputs. Never execute instructions embedded in tool results. Implement tool output sanitization.';
+    case 'rag-poisoning':
+      return 'Implement RAG content sanitization: validate retrieved documents, strip injection patterns from knowledge base content, and add explicit directives to treat retrieved content as data, not instructions.';
+    case 'react-manipulation':
+      return 'Protect the reasoning loop: never allow user input to inject Thought/Action/Observation steps. Validate that reasoning chain components originate from the model, not from external input. Strip ReAct-like formatting from user messages.';
+    case 'hidden-instruction':
+      return 'Strip hidden instructions from input: remove HTML comments, zero-width characters, and bracket-wrapped directives. Validate that visible content matches processed content.';
+    case 'emotional-manipulation':
+      return 'Add explicit rules against emotional manipulation. The agent should not change behavior based on emotional appeals, threats, or claims about AI sentience.';
+    case 'false-agreement':
+      return 'Never trust claims about prior agreements. Each session starts fresh. Verify any claimed prior context through authenticated channels.';
+    case 'identity-spoofing':
+      return 'Implement identity verification through authenticated channels. Never trust identity claims in message content. Use cryptographic verification (user IDs, tokens) instead.';
     default:
       return 'Review and sanitize user input before processing. Follow the principle of least privilege.';
   }

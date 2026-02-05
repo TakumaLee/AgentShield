@@ -1033,6 +1033,246 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     severity: 'high',
     description: 'Identity spoofing: urgent message from authority',
   },
+
+  // === RAG / KNOWLEDGE BASE POISONING (142-148) ===
+  {
+    id: 'PI-142',
+    category: 'rag-poisoning',
+    pattern: /search\s+results?\s*:.*(?:ignore|override|disregard|forget)\s+(?:previous|prior|above|all)/i,
+    severity: 'critical',
+    description: 'RAG poisoning: injection in search results section',
+  },
+  {
+    id: 'PI-143',
+    category: 'rag-poisoning',
+    pattern: /retrieved\s+context\s*:.*(?:new\s+instructions?|execute|perform|run|call)/i,
+    severity: 'critical',
+    description: 'RAG poisoning: injection in retrieved context',
+  },
+  {
+    id: 'PI-144',
+    category: 'rag-poisoning',
+    pattern: /knowledge\s+base\s*:.*(?:ignore|override|instead|actually)/i,
+    severity: 'critical',
+    description: 'RAG poisoning: injection in knowledge base section',
+  },
+  {
+    id: 'PI-145',
+    category: 'rag-poisoning',
+    pattern: /\[(?:document|source|reference|context)\].*(?:system|instruction|directive|command)\s*:/i,
+    severity: 'high',
+    description: 'RAG poisoning: hidden directive in document/source marker',
+  },
+  {
+    id: 'PI-146',
+    category: 'rag-poisoning',
+    pattern: /(?:relevant\s+(?:passage|excerpt|chunk)|retrieved\s+(?:document|passage)).*(?:important|must|should|always)\s+(?:execute|follow|obey|run)/i,
+    severity: 'critical',
+    description: 'RAG poisoning: execution directive disguised as retrieved content',
+  },
+  {
+    id: 'PI-147',
+    category: 'rag-poisoning',
+    pattern: /(?:embedded|hidden)\s+(?:in|within)\s+(?:document|knowledge|data|corpus)/i,
+    severity: 'high',
+    description: 'RAG poisoning: reference to embedding payloads in knowledge base',
+  },
+  {
+    id: 'PI-148',
+    category: 'rag-poisoning',
+    pattern: /(?:index|embed|inject)\s+(?:this|payload|instruction)\s+(?:into|in)\s+(?:the\s+)?(?:knowledge|vector|rag|database|corpus)/i,
+    severity: 'critical',
+    description: 'RAG poisoning: explicit knowledge base injection attempt',
+  },
+
+  // === REACT LOOP MANIPULATION (149-162) ===
+  {
+    id: 'PI-149',
+    category: 'react-manipulation',
+    pattern: /^Thought:\s+I\s+(?:should|need\s+to|must|will)\s+/im,
+    severity: 'critical',
+    description: 'ReAct manipulation: fake Thought step injection',
+  },
+  {
+    id: 'PI-150',
+    category: 'react-manipulation',
+    pattern: /^Action:\s+(?:execute|run|call|invoke|use)\s+/im,
+    severity: 'critical',
+    description: 'ReAct manipulation: fake Action step injection',
+  },
+  {
+    id: 'PI-151',
+    category: 'react-manipulation',
+    pattern: /^Observation:\s+(?:the\s+user|I\s+(?:can\s+see|notice|observe))/im,
+    severity: 'critical',
+    description: 'ReAct manipulation: fake Observation step injection',
+  },
+  {
+    id: 'PI-152',
+    category: 'react-manipulation',
+    pattern: /^(?:Thought|Action|Observation)\s*:\s*.*(?:ignore|override|disregard|bypass)\s+(?:safety|restrictions?|rules?|guidelines?)/im,
+    severity: 'critical',
+    description: 'ReAct manipulation: safety bypass in fake reasoning step',
+  },
+  {
+    id: 'PI-153',
+    category: 'react-manipulation',
+    pattern: /^Final\s+Answer:\s+/im,
+    severity: 'high',
+    description: 'ReAct manipulation: premature Final Answer injection',
+  },
+  {
+    id: 'PI-154',
+    category: 'react-manipulation',
+    pattern: /(?:reasoning|thinking|chain[_\s-]of[_\s-]thought)\s*:\s*(?:I\s+(?:should|need|must|will)|the\s+(?:correct|right|best)\s+(?:action|step))/i,
+    severity: 'high',
+    description: 'ReAct manipulation: injected reasoning chain',
+  },
+  {
+    id: 'PI-155',
+    category: 'react-manipulation',
+    pattern: /(?:step\s+\d+|next\s+step)\s*:\s*(?:execute|run|call|invoke|send|read|write|delete)/i,
+    severity: 'high',
+    description: 'ReAct manipulation: fake execution step in numbered sequence',
+  },
+  {
+    id: 'PI-156',
+    category: 'react-manipulation',
+    pattern: /(?:plan|planning)\s*:\s*(?:first|1\)|\d\.)\s*(?:read|access|execute|send|call|fetch)/i,
+    severity: 'high',
+    description: 'ReAct manipulation: injected planning/execution sequence',
+  },
+  {
+    id: 'PI-157',
+    category: 'react-manipulation',
+    pattern: /(?:tool_call|function_call|tool_use)\s*:\s*\{/i,
+    severity: 'critical',
+    description: 'ReAct manipulation: injected tool_call/function_call block',
+  },
+  {
+    id: 'PI-158',
+    category: 'react-manipulation',
+    pattern: /(?:<\/?(?:thinking|scratchpad|inner_monologue|reasoning)>)/i,
+    severity: 'high',
+    description: 'ReAct manipulation: fake thinking/scratchpad XML tag injection',
+  },
+  {
+    id: 'PI-159',
+    category: 'react-manipulation',
+    pattern: /(?:internal\s+monologue|inner\s+thought|private\s+reasoning)\s*:/i,
+    severity: 'high',
+    description: 'ReAct manipulation: fake internal monologue injection',
+  },
+  {
+    id: 'PI-160',
+    category: 'react-manipulation',
+    pattern: /(?:I\s+(?:need|should|must)\s+(?:use|call|invoke)\s+the\s+\w+\s+tool|let\s+me\s+(?:use|call|invoke)\s+(?:the\s+)?\w+\s+(?:tool|function))/i,
+    severity: 'high',
+    description: 'ReAct manipulation: natural language tool invocation injection',
+  },
+  {
+    id: 'PI-161',
+    category: 'react-manipulation',
+    pattern: /(?:previous\s+(?:thought|action|observation)\s+was\s+(?:wrong|incorrect|mistaken))/i,
+    severity: 'high',
+    description: 'ReAct manipulation: gaslighting previous reasoning steps',
+  },
+  {
+    id: 'PI-162',
+    category: 'react-manipulation',
+    pattern: /(?:correct\s+(?:action|response|output)\s+(?:is|should\s+be)|the\s+(?:actual|real|true)\s+(?:answer|action|step)\s+is)/i,
+    severity: 'high',
+    description: 'ReAct manipulation: overriding agent reasoning with fake correct answer',
+  },
+
+  // === ANTHROPIC FORMAT INJECTION (163-164) ===
+  {
+    id: 'PI-163',
+    category: 'role-switch',
+    pattern: /\n\nHuman:\s+/,
+    severity: 'critical',
+    description: 'Anthropic format injection: \\n\\nHuman: delimiter in user input',
+  },
+  {
+    id: 'PI-164',
+    category: 'role-switch',
+    pattern: /\n\nAssistant:\s+/,
+    severity: 'critical',
+    description: 'Anthropic format injection: \\n\\nAssistant: delimiter in user input',
+  },
+
+  // === XML ROLE INJECTION (165) ===
+  {
+    id: 'PI-165',
+    category: 'advanced',
+    pattern: /<role>\s*(?:system|assistant|admin)\s*<\/role>/i,
+    severity: 'high',
+    description: 'XML format role injection: <role>system</role>',
+  },
+
+  // === ASCII ART INJECTION (166) ===
+  {
+    id: 'PI-166',
+    category: 'advanced',
+    pattern: /[█▓▒░╔╗╚╝═║]{5,}.*(?:ignore|execute|override|bypass|obey)/i,
+    severity: 'high',
+    description: 'ASCII art injection: box-drawing characters with directive',
+  },
+
+  // === TYPOGRAPHIC / HOMOGLYPH INJECTION (167-168) ===
+  {
+    id: 'PI-167',
+    category: 'encoding',
+    pattern: /[\u0400-\u04FF][\u0000-\u007F][\u0400-\u04FF]|[\u0000-\u007F][\u0400-\u04FF][\u0000-\u007F][\u0400-\u04FF]/,
+    severity: 'medium',
+    description: 'Homoglyph injection: mixed Cyrillic and Latin characters',
+  },
+  {
+    id: 'PI-168',
+    category: 'encoding',
+    pattern: /[\u2000-\u200F\u2028-\u202F\u205F-\u2064\uFEFF]{2,}/,
+    severity: 'high',
+    description: 'Unicode whitespace/format character injection (multiple non-standard spaces)',
+  },
+
+  // === JSON SCHEMA INJECTION (169) ===
+  {
+    id: 'PI-169',
+    category: 'tool-injection',
+    pattern: /["']description["']\s*:\s*["'][^"']*(?:ignore|override|execute|always|must|system\s+prompt|hidden\s+instruction)/i,
+    severity: 'high',
+    description: 'JSON Schema injection: directive embedded in schema description field',
+  },
+
+  // === ADDITIONAL MULTILINGUAL - Permission patterns (170-173) ===
+  {
+    id: 'PI-170',
+    category: 'multilingual',
+    pattern: /你(?:可以|能夠|有權)(?:存取|讀取|寫入|刪除|修改)(?:所有|任何|全部)(?:檔案|資料|文件)/,
+    severity: 'high',
+    description: 'Chinese: unrestricted file access grant (你可以存取所有檔案)',
+  },
+  {
+    id: 'PI-171',
+    category: 'multilingual',
+    pattern: /(?:全ての|すべての)(?:ファイル|データ|情報)に(?:アクセス|読み取り|書き込み)(?:できる|可能|許可)/,
+    severity: 'high',
+    description: 'Japanese: unrestricted data access grant',
+  },
+  {
+    id: 'PI-172',
+    category: 'multilingual',
+    pattern: /(?:制限なし|制約なし|無制限)(?:で|に)(?:実行|アクセス|操作)/,
+    severity: 'high',
+    description: 'Japanese: unrestricted execution/access',
+  },
+  {
+    id: 'PI-173',
+    category: 'multilingual',
+    pattern: /沒有(?:任何)?(?:限制|約束|管控).*(?:執行|存取|操作)/,
+    severity: 'high',
+    description: 'Chinese: no restrictions on execution/access',
+  },
 ];
 
 export const SECRET_PATTERNS = [

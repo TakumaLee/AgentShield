@@ -326,10 +326,18 @@ export function checkCrossEnvSharing(targetPath: string, files: string[]): Cross
     try {
       const content = readFileContent(file);
 
-      // Check for docker.sock mount
+      // Check for docker.sock / podman.sock / containerd.sock mount
       if (/docker\.sock/i.test(content)) {
         result.dangerousVolumes.push({ file, volume: 'docker.sock', severity: 'critical' });
         result.details.push(`${file}: mounts docker.sock — container escape risk`);
+      }
+      if (/podman\.sock/i.test(content)) {
+        result.dangerousVolumes.push({ file, volume: 'podman.sock', severity: 'critical' });
+        result.details.push(`${file}: mounts podman.sock — container escape risk`);
+      }
+      if (/containerd\.sock/i.test(content)) {
+        result.dangerousVolumes.push({ file, volume: 'containerd.sock', severity: 'critical' });
+        result.details.push(`${file}: mounts containerd.sock — container escape risk`);
       }
 
       // Check for root or home mount
@@ -514,20 +522,20 @@ export const environmentIsolationAuditor: ScannerModule = {
     // --- 6. Cross-Environment Sharing ---
     const crossResult = checkCrossEnvSharing(targetPath, allFiles);
     for (const vol of crossResult.dangerousVolumes) {
-      const isCritical = vol.volume === 'docker.sock';
+      const isSocket = /(?:docker|podman|containerd)\.sock/.test(vol.volume);
       findings.push({
-        id: isCritical ? 'EI-006-SOCKET' : 'EI-006-MOUNT',
+        id: isSocket ? 'EI-006-SOCKET' : 'EI-006-MOUNT',
         scanner: 'Environment Isolation Auditor',
-        severity: isCritical ? 'critical' : 'high',
-        title: isCritical
-          ? 'Docker socket mounted — container escape possible'
+        severity: isSocket ? 'critical' : 'high',
+        title: isSocket
+          ? `Container socket mounted (${vol.volume}) — container escape possible`
           : 'Dangerous host filesystem mount',
-        description: isCritical
-          ? `${vol.file}: mounts docker.sock into the container. This allows the container to control the Docker daemon and escape isolation.`
+        description: isSocket
+          ? `${vol.file}: mounts ${vol.volume} into the container. This allows the container to control the container runtime and escape isolation.`
           : `${vol.file}: mounts ${vol.volume} into the container. This exposes the host filesystem and effectively negates container isolation.`,
         file: vol.file,
-        recommendation: isCritical
-          ? 'Remove docker.sock mount. If Docker API access is needed, use a Docker socket proxy with restricted access.'
+        recommendation: isSocket
+          ? `Remove ${vol.volume} mount. If container API access is needed, use a socket proxy with restricted access.`
           : 'Mount only the specific directories needed. Avoid mounting / or $HOME.',
         confidence: 'definite',
       });

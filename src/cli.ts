@@ -142,7 +142,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   // Build report
   const ignoredCount = getIgnoredFileCount();
   const report: ScanReport = {
-    version: '0.4.0',
+    version: '0.5.0',
     timestamp: new Date().toISOString(),
     target: absPath,
     results,
