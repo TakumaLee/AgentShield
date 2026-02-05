@@ -62,7 +62,7 @@ aiagentshield scan ./my-agent/ --json
 
 That's it. No API keys. No cloud. Everything runs locally.
 
-## 🔍 9 Security Scanners
+## 🔍 10 Security Scanners
 
 | # | Scanner | What it catches |
 |---|---------|----------------|
@@ -75,6 +75,7 @@ That's it. No API keys. No cloud. Everything runs locally.
 | 🎯 | **Red Team Simulator** | 7 simulated attack vectors including cross-channel spoofing |
 | 📡 | **Channel Surface Auditor** | Email, social media, Telegram, Discord — per-channel defense checks |
 | ⚙️ | **Agent Config Auditor** | Gateway exposure, plaintext bot tokens, open DM policies |
+| 🏗️ | **Environment Isolation Auditor** | Container/VM detection, file permissions, dangerous Docker mounts, resource limits |
 
 ## 📊 Security Grades
 
@@ -168,6 +169,9 @@ Detects external channels (email, social media, Telegram, Discord, browser, file
 
 ### Agent Config Auditor
 Audits AI Agent platform config files for gateway exposure, missing auth, no sender restrictions, open DM policies, plaintext bot tokens, default ports, missing logging, and missing redaction settings.
+
+### Environment Isolation Auditor
+Checks the runtime environment for security isolation: container/VM detection (Docker, LXC, VMware, etc.), sensitive config file permissions (world-readable checks), network isolation (docker-compose networks, Dockerfile EXPOSE), resource limits (mem_limit, cpus), snapshot/rollback capability (git, Dockerfile), and dangerous Docker mounts (docker.sock, privileged mode, root/home mounts).
 
 </details>
 

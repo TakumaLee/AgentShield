@@ -10,6 +10,7 @@ import { skillAuditor } from './scanners/skill-auditor';
 import { redTeamSimulator } from './scanners/red-team-simulator';
 import { channelSurfaceAuditor } from './scanners/channel-surface-auditor';
 import { agentConfigAuditor } from './scanners/agent-config-auditor';
+import { environmentIsolationAuditor } from './scanners/environment-isolation-auditor';
 import { calculateSummary } from './utils/scorer';
 import { printReport, writeJsonReport } from './utils/reporter';
 import { fileExists, resetIgnoredFileCount, getIgnoredFileCount } from './utils/file-utils';
@@ -25,6 +26,7 @@ const SCANNERS: ScannerModule[] = [
   redTeamSimulator,
   channelSurfaceAuditor,
   agentConfigAuditor,
+  environmentIsolationAuditor,
 ];
 
 export type ProfileType = 'agent' | 'general' | 'mobile';
@@ -140,7 +142,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   // Build report
   const ignoredCount = getIgnoredFileCount();
   const report: ScanReport = {
-    version: '0.3.1',
+    version: '0.4.0',
     timestamp: new Date().toISOString(),
     target: absPath,
     results,

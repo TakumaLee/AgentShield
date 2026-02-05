@@ -60,6 +60,7 @@ export interface ReportSummary {
     codeSafety: DimensionScore;
     configSafety: DimensionScore;
     defenseScore: DimensionScore;
+    environmentSafety: DimensionScore;
   };
   scannerBreakdown?: Record<string, Record<Severity, number>>;
 }

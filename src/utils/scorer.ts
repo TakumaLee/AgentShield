@@ -25,7 +25,7 @@ const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
 };
 
 // Scanner → dimension mapping
-const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScore'> = {
+const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScore' | 'environmentSafety'> = {
   'Secret Leak Scanner': 'codeSafety',
   'Prompt Injection Tester': 'codeSafety',
   'Skill Auditor': 'codeSafety',
@@ -34,6 +34,7 @@ const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScor
   'Channel Surface Auditor': 'configSafety',
   'Defense Analyzer': 'defenseScore',
   'Red Team Simulator': 'defenseScore',
+  'Environment Isolation Auditor': 'environmentSafety',
 };
 
 function diminishingPenalty(count: number, basePenalty: number, maxPenalty: number): number {
@@ -99,10 +100,11 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
 
   const allFindings: Finding[] = [];
   const scoringFindings: Finding[] = []; // Findings that count toward score (excludes test files and Secret Leak INFO)
-  const dimensionFindings: Record<'codeSafety' | 'configSafety' | 'defenseScore', Finding[]> = {
+  const dimensionFindings: Record<'codeSafety' | 'configSafety' | 'defenseScore' | 'environmentSafety', Finding[]> = {
     codeSafety: [],
     configSafety: [],
     defenseScore: [],
+    environmentSafety: [],
   };
   const scannerBreakdown: Record<string, Record<Severity, number>> = {};
 
@@ -158,13 +160,15 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
     codeSafety: buildDimensionScore(dimensionFindings.codeSafety),
     configSafety: buildDimensionScore(dimensionFindings.configSafety),
     defenseScore: buildDimensionScore(dimensionFindings.defenseScore),
+    environmentSafety: buildDimensionScore(dimensionFindings.environmentSafety),
   };
 
   // Overall grade uses weighted average of dimension scores
-  // Code Safety 40% (direct attack surface: secrets, injection)
-  // Config Safety 30% (MCP, permissions, channels)
-  // Defense Score 30% (defense layers, red team resilience)
-  const DIMENSION_WEIGHTS = { codeSafety: 0.4, configSafety: 0.3, defenseScore: 0.3 };
+  // Code Safety 35% (direct attack surface: secrets, injection)
+  // Config Safety 25% (MCP, permissions, channels)
+  // Defense Score 25% (defense layers, red team resilience)
+  // Environment Safety 15% (container/VM isolation, file perms, Docker config)
+  const DIMENSION_WEIGHTS = { codeSafety: 0.35, configSafety: 0.25, defenseScore: 0.25, environmentSafety: 0.15 };
 
   let finalScore = score;
   let finalGrade = grade;
@@ -176,13 +180,14 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
     const weightedScore = Math.round(
       dimensions.codeSafety.score * DIMENSION_WEIGHTS.codeSafety +
       dimensions.configSafety.score * DIMENSION_WEIGHTS.configSafety +
-      dimensions.defenseScore.score * DIMENSION_WEIGHTS.defenseScore
+      dimensions.defenseScore.score * DIMENSION_WEIGHTS.defenseScore +
+      dimensions.environmentSafety.score * DIMENSION_WEIGHTS.environmentSafety
     );
 
     // Floor rule: if ANY dimension is F (<60), cap overall at that dimension's score + 10.
     // Rationale: a catastrophic failure in one area (e.g., leaked API keys) shouldn't be
     // rescued by good scores elsewhere. Security is only as strong as the weakest link.
-    const dimScores = [dimensions.codeSafety.score, dimensions.configSafety.score, dimensions.defenseScore.score];
+    const dimScores = [dimensions.codeSafety.score, dimensions.configSafety.score, dimensions.defenseScore.score, dimensions.environmentSafety.score];
     const minDimScore = Math.min(...dimScores);
     const floorCap = minDimScore < 60 ? minDimScore + 10 : Infinity;
 

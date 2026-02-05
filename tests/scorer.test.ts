@@ -37,8 +37,8 @@ describe('Scorer', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
-    expect(summary.score).toBe(92);
+    // codeSafety=80, weighted: 80×0.35+100×0.25+100×0.25+100×0.15=93
+    expect(summary.score).toBe(93);
     expect(summary.critical).toBe(1);
   });
 
@@ -151,8 +151,8 @@ describe('Interaction Penalty', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // codeSafety=70, weighted: 70×0.4+100×0.3+100×0.3=88
-    expect(summary.score).toBe(88);
+    // codeSafety=70, weighted: 70×0.35+100×0.25+100×0.25+100×0.15=90 (floor cap may apply)
+    expect(summary.score).toBe(90);
   });
 });
 
@@ -165,8 +165,8 @@ describe('Confidence Weighting', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
-    expect(summary.score).toBe(92);
+    // codeSafety=80, weighted: 80×0.35+100×0.25+100×0.25+100×0.15=93
+    expect(summary.score).toBe(93);
   });
 
   test('possible findings have reduced weight', () => {
@@ -185,8 +185,8 @@ describe('Confidence Weighting', () => {
     const summary = calculateSummary(results);
     const expectedPenalty = 5 * Math.log2(1.8 + 1);
     const dimScore = Math.round(100 - expectedPenalty);
-    // weighted: dimScore×0.4+100×0.3+100×0.3
-    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
+    // weighted: dimScore×0.35+100×0.25+100×0.25+100×0.15
+    expect(summary.score).toBe(Math.round(dimScore * 0.35 + 100 * 0.25 + 100 * 0.25 + 100 * 0.15));
   });
 
   test('likely findings have 0.8 weight', () => {
@@ -203,7 +203,7 @@ describe('Confidence Weighting', () => {
     const expectedPenalty = 20 * Math.log2(4.0 + 1);
     const dimScore = Math.round(100 - expectedPenalty); // ~54 (F)
     // weighted would be ~82, but floor cap: 54+10=64
-    const weighted = Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3);
+    const weighted = Math.round(dimScore * 0.35 + 100 * 0.25 + 100 * 0.25 + 100 * 0.15);
     const floorCap = dimScore + 10;
     expect(summary.score).toBe(Math.min(weighted, floorCap));
   });
@@ -216,8 +216,8 @@ describe('Confidence Weighting', () => {
       duration: 50,
     }];
     const summary = calculateSummary(results);
-    // codeSafety=80, weighted: 80×0.4+100×0.3+100×0.3=92
-    expect(summary.score).toBe(92);
+    // codeSafety=80, weighted: 80×0.35+100×0.25+100×0.25+100×0.15=93
+    expect(summary.score).toBe(93);
   });
 
   test('mixed confidence is weighted correctly', () => {
@@ -235,8 +235,8 @@ describe('Confidence Weighting', () => {
     const summary = calculateSummary(results);
     const expectedPenalty = 20 * Math.log2(1.6 + 1);
     const dimScore = Math.round(100 - expectedPenalty);
-    // weighted: dimScore×0.4+100×0.3+100×0.3
-    expect(summary.score).toBe(Math.round(dimScore * 0.4 + 100 * 0.3 + 100 * 0.3));
+    // weighted: dimScore×0.35+100×0.25+100×0.25+100×0.15
+    expect(summary.score).toBe(Math.round(dimScore * 0.35 + 100 * 0.25 + 100 * 0.25 + 100 * 0.15));
   });
 });
 
@@ -315,7 +315,7 @@ describe('Three-Dimension Scoring', () => {
     ];
     const summary = calculateSummary(results);
     // Code safety is bad (50, F), config is perfect.
-    // Weighted would be 80, but floor cap: 50+10=60
+    // Weighted would be ~83, but floor cap: 50+10=60
     expect(summary.score).toBe(60);
   });
 
@@ -328,6 +328,7 @@ describe('Three-Dimension Scoring', () => {
     expect(summary.dimensions!.codeSafety.grade).toBe('A+');
     expect(summary.dimensions!.configSafety.grade).toBe('A+');
     expect(summary.dimensions!.defenseScore.grade).toBe('A+');
+    expect(summary.dimensions!.environmentSafety.grade).toBe('A+');
   });
 });
 

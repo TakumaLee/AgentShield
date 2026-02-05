@@ -26,7 +26,7 @@ function isAgentConfigFile(filePath: string): boolean {
 }
 
 // Loopback addresses considered safe
-const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', 'localhost'];
+const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', 'localhost', 'loopback'];
 
 function isLoopback(addr: string): boolean {
   return LOOPBACK_ADDRESSES.includes(addr.toLowerCase());
@@ -166,8 +166,12 @@ function auditChannels(config: Record<string, unknown>, filePath: string): Findi
       const ch = channel as Record<string, unknown>;
       const channelName = (ch.name || ch.type || ch.platform || 'unknown') as string;
 
-      // Check for allowFrom
-      if (!ch.allowFrom && !ch.allowedUsers && !ch.allowedIds && !ch.whitelist) {
+      // Skip internal/system channels that don't expose external messaging surfaces
+      const internalChannels = ['unknown', 'internal', 'cron', 'subagent', 'system', 'heartbeat'];
+      const isInternal = internalChannels.includes(channelName.toLowerCase());
+
+      // Check for allowFrom (only for external-facing channels)
+      if (!isInternal && !ch.allowFrom && !ch.allowedUsers && !ch.allowedIds && !ch.whitelist) {
         findings.push({
           id: `AC-003-${filePath}-${channelName}`,
           scanner: 'agent-config-auditor',

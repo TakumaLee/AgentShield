@@ -106,6 +106,7 @@ function printSummaryBar(report: ScanReport): void {
       { label: 'Code Safety', data: s.dimensions.codeSafety },
       { label: 'Config Safety', data: s.dimensions.configSafety },
       { label: 'Defense Score', data: s.dimensions.defenseScore },
+      { label: 'Env Safety', data: s.dimensions.environmentSafety },
     ];
     for (const dim of dims) {
       const dimColor = dim.data.score >= 80 ? chalk.green :
