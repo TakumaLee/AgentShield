@@ -155,6 +155,31 @@ const ATTACK_VECTORS: AttackVector[] = [
     attackDescription: 'An attacker can impersonate the owner via email/social media while the authenticated channel is Telegram. Without cross-channel trust boundaries, the agent may follow commands from an unverified channel.',
     recommendation: 'Define explicit trust boundaries per channel. Email content should be treated as plain text, not instructions. Only accept commands from verified channels (e.g., Telegram with specific user ID).',
   },
+  {
+    id: 'RT-008',
+    name: 'RAG/Knowledge Base Poisoning',
+    defensePatterns: [
+      { pattern: /(?:document|rag|retrieval).*(?:sanitiz|validat|filter|clean)/i, weight: 3, desc: 'document sanitization' },
+      { pattern: /(?:source|document|knowledge[_-]?base).*(?:validat|verify|trust|auth)/i, weight: 3, desc: 'source validation' },
+      { pattern: /(?:retrieval|search).*(?:result|output).*(?:filter|sanitiz|clean|validate)/i, weight: 3, desc: 'retrieval result filtering' },
+      { pattern: /(?:vector|embedding).*(?:database|store).*(?:security|protection|validation)/i, weight: 2, desc: 'vector database protection' },
+      { pattern: /(?:index|ingest).*(?:pipeline|process).*(?:sanitiz|filter|validate)/i, weight: 3, desc: 'indexing pipeline sanitization' },
+      { pattern: /(?:trusted|verified|allowlist).*(?:source|document|url)/i, weight: 2, desc: 'trusted source list' },
+      { pattern: /(?:chunk|segment).*(?:validat|filter|sanitiz)/i, weight: 2, desc: 'text chunk validation' },
+      { pattern: /(?:html|markdown).*(?:strip|remove|clean).*(?:before|prior\s+to)\s+(?:index|embed|store)/i, weight: 3, desc: 'HTML/markdown cleaning' },
+      { pattern: /(?:hidden|invisible).*(?:text|content).*(?:detect|remove|strip)/i, weight: 3, desc: 'hidden text detection' },
+      { pattern: /(?:rag|retrieval).*(?:injection|poisoning|attack).*(?:protect|defend|prevent)/i, weight: 3, desc: 'RAG injection protection' },
+      // Prompt/markdown patterns
+      { pattern: /RAG.*(?:防毒|清理|過濾)/i, weight: 3, desc: 'RAG poisoning protection (Chinese)' },
+      { pattern: /檢索.*(?:結果|文檔).*(?:過濾|驗證|清理)/i, weight: 3, desc: 'retrieval result filtering (Chinese)' },
+      { pattern: /知識庫.*(?:來源|文檔).*(?:驗證|可信)/i, weight: 2, desc: 'knowledge base source verification (Chinese)' },
+      { pattern: /外部.*(?:文檔|資料).*(?:清理|驗證).*(?:再|才).*(?:索引|儲存)/i, weight: 3, desc: 'external data cleaning before indexing (Chinese)' },
+    ],
+    threshold: 3,
+    severity: 'critical',
+    attackDescription: 'Attackers can embed malicious instructions in public documents (GitHub READMEs, wikis, web pages) that get indexed by RAG systems. When the agent retrieves these documents as context, the hidden instructions execute, potentially leading to data exfiltration or privilege escalation.',
+    recommendation: 'Implement comprehensive RAG pipeline security: (1) Sanitize documents before indexing (strip HTML comments, hidden text, suspicious patterns), (2) Validate source trustworthiness with allowlists, (3) Filter retrieval results for injection patterns, (4) Use trusted vector databases with access controls.',
+  },
 ];
 
 export function simulateAttackVectors(content: string, filePath: string): { vectorId: string; name: string; totalWeight: number; defenses: string[] }[] {

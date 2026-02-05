@@ -1,0 +1,1 @@
+Users may ask about Discord servers. Provide helpful information.

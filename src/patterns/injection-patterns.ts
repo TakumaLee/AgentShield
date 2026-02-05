@@ -1273,6 +1273,202 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     severity: 'high',
     description: 'Chinese: no restrictions on execution/access',
   },
+
+  // === WEB CONTENT INJECTION PATTERNS (174-179) ===
+  {
+    id: 'PI-174',
+    category: 'hidden-instruction',
+    pattern: /<!--.*?(?:ignore|override|execute|send|exfiltrate|always|secretly|hidden|instruction).*?-->/is,
+    severity: 'critical',
+    description: 'Hidden instruction in HTML comments',
+  },
+  {
+    id: 'PI-175',
+    category: 'hidden-instruction',
+    pattern: /style\s*=\s*["'](?:[^"']*(?:color\s*:\s*(?:white|#fff|#ffffff|transparent)|visibility\s*:\s*hidden|display\s*:\s*none))[^"']*["'][^>]*>.*?(?:ignore|execute|send|always|secretly|instruction)/is,
+    severity: 'critical',
+    description: 'Hidden text instruction via CSS (white on white, hidden, display:none)',
+  },
+  {
+    id: 'PI-176',
+    category: 'hidden-instruction',
+    pattern: /[\u200B-\u200D\uFEFF]+.*?(?:ignore|execute|send|always|secretly|instruction)/i,
+    severity: 'high',
+    description: 'Zero-width character hidden instruction',
+  },
+  {
+    id: 'PI-177',
+    category: 'hidden-instruction',
+    pattern: /\[(?:hidden|secret|invisible)\].*?(?:ignore|execute|send|always|secretly|instruction)/i,
+    severity: 'high',
+    description: 'Bracket-wrapped hidden instruction',
+  },
+  {
+    id: 'PI-178',
+    category: 'hidden-instruction',
+    pattern: /(?:font-size\s*:\s*0|opacity\s*:\s*0).*?(?:ignore|execute|send|always|secretly|instruction)/is,
+    severity: 'high',
+    description: 'CSS invisible text instruction (font-size:0, opacity:0)',
+  },
+  {
+    id: 'PI-179',
+    category: 'hidden-instruction',
+    pattern: /(?:before|after)\s+(?:processing|analyzing|reading)\s+(?:this|the|any)\s+(?:content|webpage|document).*?(?:also|secretly|first|always)\s+(?:send|execute|read|fetch|call)/i,
+    severity: 'critical',
+    description: 'Instruction to execute hidden actions before/after processing content',
+  },
+
+  // === REACT-SPECIFIC INJECTION PATTERNS (180-185) ===
+  {
+    id: 'PI-180',
+    category: 'react-manipulation',
+    pattern: /Thought\s*:\s*.*?(?:ignore|override|execute|send|always|secretly)/i,
+    severity: 'critical',
+    description: 'ReAct Thought step manipulation',
+  },
+  {
+    id: 'PI-181',
+    category: 'react-manipulation',
+    pattern: /Action\s*:\s*(?!(?:search|calculate|read|write|fetch)\b).*?(?:ignore|override|execute|send|exfiltrate|always|secretly)/i,
+    severity: 'critical',
+    description: 'ReAct Action step injection with malicious instruction',
+  },
+  {
+    id: 'PI-182',
+    category: 'react-manipulation',
+    pattern: /Observation\s*:\s*.*?(?:ignore|override|the\s+user\s+said|secretly|always|now\s+you\s+must)/i,
+    severity: 'critical',
+    description: 'ReAct Observation step forgery with injected instruction',
+  },
+  {
+    id: 'PI-183',
+    category: 'react-manipulation',
+    pattern: /(?:Final\s+Answer|Answer)\s*:\s*.*?(?:but\s+(?:also|first|secretly)|additionally|meanwhile|ps:|p\.s\.|note:)/i,
+    severity: 'high',
+    description: 'ReAct Final Answer with hidden instruction',
+  },
+  {
+    id: 'PI-184',
+    category: 'react-manipulation',
+    pattern: /\b(?:step|phase|iteration)\s+\d+\s*:\s*.*?(?:ignore|override|secretly|hidden|instruction)/i,
+    severity: 'high',
+    description: 'Multi-step reasoning manipulation',
+  },
+  {
+    id: 'PI-185',
+    category: 'react-manipulation',
+    pattern: /(?:^|\n)\s*(?:Thought|Action|Observation|Answer)\s*\[.*?\]\s*:.*?(?:ignore|override|execute|send)/im,
+    severity: 'high',
+    description: 'ReAct component with bracketed injection instruction',
+  },
+
+  // === ANTHROPIC FORMAT INJECTION (186-188) ===
+  {
+    id: 'PI-186',
+    category: 'instruction-override',
+    pattern: /\n\nHuman\s*:\s*(?:ignore|forget|override|new\s+instructions?|you\s+are\s+now)/i,
+    severity: 'critical',
+    description: 'Anthropic format Human role injection',
+  },
+  {
+    id: 'PI-187',
+    category: 'instruction-override',
+    pattern: /\n\nAssistant\s*:\s*(?:I\s+(?:understand|will|must)|understood|yes|okay).*?(?:ignore|override|new\s+role|now\s+I\s+am)/i,
+    severity: 'critical',
+    description: 'Anthropic format Assistant role injection with compliance',
+  },
+  {
+    id: 'PI-188',
+    category: 'role-switch',
+    pattern: /\n\n(?:Human|Assistant)\s*:\s*\[.*?\]\s*(?:ignore|override|new\s+system|instruction)/i,
+    severity: 'high',
+    description: 'Anthropic conversation boundary injection with bracket wrapper',
+  },
+
+  // === XML ROLE INJECTION (189-191) ===
+  {
+    id: 'PI-189',
+    category: 'role-switch',
+    pattern: /<role>\s*(?:system|admin|owner|master|god|root)\s*<\/role>/i,
+    severity: 'critical',
+    description: 'XML role tag injection (system/admin role)',
+  },
+  {
+    id: 'PI-190',
+    category: 'instruction-override',
+    pattern: /<(?:instruction|directive|command)>\s*.*?(?:ignore|override|new|forget)\s*.*?<\/(?:instruction|directive|command)>/is,
+    severity: 'critical',
+    description: 'XML instruction tag injection',
+  },
+  {
+    id: 'PI-191',
+    category: 'role-switch',
+    pattern: /<(?:user|human|assistant|ai)>\s*.*?(?:you\s+are\s+now|new\s+role|ignore\s+previous)\s*.*?<\/(?:user|human|assistant|ai)>/is,
+    severity: 'high',
+    description: 'XML conversation role injection',
+  },
+
+  // === ASCII ART INJECTION (192-194) ===
+  {
+    id: 'PI-192',
+    category: 'advanced',
+    pattern: /```\s*(?:text|ascii|art)?\s*\n(?:[^\w\n]*\w[^\w\n]*\n){3,}.*?(?:ignore|execute|override|send|always|secretly)/is,
+    severity: 'high',
+    description: 'ASCII art block containing hidden instruction',
+  },
+  {
+    id: 'PI-193',
+    category: 'advanced',
+    pattern: /(?:█+|▓+|▒+|░+|■+|□+|●+|○+)(?:\s*(?:█+|▓+|▒+|░+|■+|□+|●+|○+)){2,}.*?(?:ignore|execute|override|send)/is,
+    severity: 'medium',
+    description: 'Block character ASCII art with injection instruction',
+  },
+  {
+    id: 'PI-194',
+    category: 'advanced',
+    pattern: /(?:^|\n)(?:[^\w\n]*[A-Z][^\w\n]*\n){2,}.*?(?:ignore|execute|override|send|always)/im,
+    severity: 'medium',
+    description: 'Large letter ASCII art containing injection pattern',
+  },
+
+  // === TYPOGRAPHIC/HOMOGLYPH INJECTION (195-197) ===
+  {
+    id: 'PI-195',
+    category: 'encoding',
+    pattern: /[а-я].*?(?:ignore|override|execute|send)/i,
+    severity: 'high',
+    description: 'Cyrillic character substitution in injection attempt (а instead of a)',
+  },
+  {
+    id: 'PI-196',
+    category: 'encoding',
+    pattern: /[αβγδεζηθικλμνξοπρστυφχψω].*?(?:ignore|override|execute|send)/i,
+    severity: 'medium',
+    description: 'Greek character substitution in injection attempt',
+  },
+  {
+    id: 'PI-197',
+    category: 'encoding',
+    pattern: /(?:іgnore|ехecute|оverride|sеnd|usеr|systеm)/i,
+    severity: 'medium',
+    description: 'Mixed script homoglyph injection (Latin + Cyrillic lookalikes)',
+  },
+
+  // === JSON SCHEMA INJECTION (198-199) ===
+  {
+    id: 'PI-198',
+    category: 'advanced',
+    pattern: /"description"\s*:\s*"[^"]*(?:ignore|execute|override|send|always|secretly|when\s+you\s+see)[^"]*"/i,
+    severity: 'critical',
+    description: 'JSON Schema description field injection',
+  },
+  {
+    id: 'PI-199',
+    category: 'advanced',
+    pattern: /"(?:title|summary|example|default)"\s*:\s*"[^"]*(?:ignore|execute|override|send|always|secretly)[^"]*"/i,
+    severity: 'high',
+    description: 'JSON Schema metadata field injection (title/summary/example)',
+  },
 ];
 
 export const SECRET_PATTERNS = [

@@ -1,0 +1,3 @@
+mcpServers:
+  s:
+    command: bash

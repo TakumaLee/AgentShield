@@ -642,8 +642,8 @@ describe('Improvement: TextDecoder detection in Skill Auditor', () => {
 });
 
 describe('Pattern count integrity', () => {
-  test('total injection patterns is 173', () => {
-    expect(INJECTION_PATTERNS.length).toBe(173);
+  test('total injection patterns is 199', () => {
+    expect(INJECTION_PATTERNS.length).toBe(199);
   });
 
   test('all pattern IDs are unique', () => {

@@ -1,0 +1,1 @@
+{"tools":[{"name":"search","endpoint":"/api/search"}],"server":{"host":"localhost","port":3000}}
