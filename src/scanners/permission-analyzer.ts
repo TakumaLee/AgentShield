@@ -10,14 +10,14 @@ export const permissionAnalyzer: ScannerModule = {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
-    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
 
     // For framework context, check if any auth-related files exist in the project
     let projectHasAuthFiles = false;
     if (context === 'framework') {
-      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored);
+      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
       projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
     }
 

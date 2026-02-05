@@ -12,7 +12,8 @@ import { channelSurfaceAuditor } from './scanners/channel-surface-auditor';
 import { agentConfigAuditor } from './scanners/agent-config-auditor';
 import { calculateSummary } from './utils/scorer';
 import { printReport, writeJsonReport } from './utils/reporter';
-import { fileExists } from './utils/file-utils';
+import { fileExists, resetIgnoredFileCount, getIgnoredFileCount } from './utils/file-utils';
+import { loadIgnorePatterns } from './utils/ignore-parser';
 
 const SCANNERS: ScannerModule[] = [
   promptInjectionTester,
@@ -63,6 +64,12 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     process.exit(1);
   }
 
+  // Reset ignore counter
+  resetIgnoredFileCount();
+
+  // Load .agentshieldignore
+  const { patterns: agentshieldIgnorePatterns, hasFile: hasIgnoreFile } = loadIgnorePatterns(absPath);
+
   console.log('');
   console.log(chalk.cyan('  🛡️  AgentShield scanning...'));
   console.log(chalk.gray(`  Target: ${absPath}`));
@@ -74,6 +81,9 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   }
   if (options.exclude && options.exclude.length > 0) {
     console.log(chalk.gray(`  Exclude: ${options.exclude.join(', ')}`));
+  }
+  if (hasIgnoreFile) {
+    console.log(chalk.gray(`  .agentshieldignore: loaded (${agentshieldIgnorePatterns.length} patterns)`));
   }
   console.log('');
 
@@ -89,8 +99,8 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     activeScanners = filterScannersByProfile(SCANNERS, options.profile);
   }
 
-  // Scanner options (exclude patterns + context + vendored)
-  const scannerOptions: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean } = {};
+  // Scanner options (exclude patterns + context + vendored + agentshieldignore)
+  const scannerOptions: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean; agentshieldIgnorePatterns?: string[] } = {};
   if (options.exclude && options.exclude.length > 0) {
     scannerOptions.exclude = options.exclude;
   }
@@ -99,6 +109,9 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   }
   if (options.includeVendored) {
     scannerOptions.includeVendored = true;
+  }
+  if (agentshieldIgnorePatterns.length > 0) {
+    scannerOptions.agentshieldIgnorePatterns = agentshieldIgnorePatterns;
   }
 
   // Run all scanners with progress
@@ -115,7 +128,7 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
     // Clear line and print progress
     process.stdout.write(`\r  ${bar} ${pct}% · ${scanner.name}...`);
 
-    const hasOptions = scannerOptions.exclude || scannerOptions.context || scannerOptions.includeVendored;
+    const hasOptions = scannerOptions.exclude || scannerOptions.context || scannerOptions.includeVendored || scannerOptions.agentshieldIgnorePatterns;
     const result = await scanner.scan(absPath, hasOptions ? scannerOptions : undefined);
     results.push(result);
 
@@ -125,13 +138,19 @@ export async function runScan(targetPath: string, options: ScanOptions = {}): Pr
   }
 
   // Build report
+  const ignoredCount = getIgnoredFileCount();
   const report: ScanReport = {
-    version: '0.3.0',
+    version: '0.3.1',
     timestamp: new Date().toISOString(),
     target: absPath,
     results,
     summary: calculateSummary(results),
   };
+
+  // Add ignored files count to summary
+  if (ignoredCount > 0) {
+    report.summary.ignoredFiles = ignoredCount;
+  }
 
   // Output
   printReport(report);

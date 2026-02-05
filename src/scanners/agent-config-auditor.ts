@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
-import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
+import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestFileForScoring } from '../utils/file-utils';
 
 /**
  * Agent Config Auditor — scans AI Agent platform configuration files
@@ -36,10 +36,10 @@ export const agentConfigAuditor: ScannerModule = {
   name: 'Agent Config Auditor',
   description: 'Audits AI Agent platform configuration files for security misconfigurations (OpenClaw, etc.)',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
+    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
 
     // Filter to agent config files only
     const configFiles = files.filter(f => isAgentConfigFile(f));

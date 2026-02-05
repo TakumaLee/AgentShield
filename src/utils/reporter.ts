@@ -93,6 +93,9 @@ function printSummaryBar(report: ScanReport): void {
   }
 
   console.log(`  ${chalk.bold('Files Scanned:')} ${s.scannedFiles}`);
+  if (s.ignoredFiles && s.ignoredFiles > 0) {
+    console.log(`  ${chalk.bold('Files Ignored:')} ${s.ignoredFiles} ${chalk.gray('(by .agentshieldignore)')}`);
+  }
   console.log(`  ${chalk.bold('Duration:')} ${s.duration}ms`);
   console.log('');
 

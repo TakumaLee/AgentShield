@@ -1,5 +1,5 @@
-import { ScannerModule, ScanResult, Finding, Severity, ScanContext } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile, isMarkdownFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, Severity, ScanContext, ScannerOptions } from '../types';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -280,7 +280,7 @@ export const skillAuditor: ScannerModule = {
   name: 'Skill Auditor',
   description: 'Scans third-party skills, plugins, and tools for suspicious behavior including data exfiltration, shell injection, and privilege escalation',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
@@ -290,7 +290,7 @@ export const skillAuditor: ScannerModule = {
       '**/*.ts',
       '**/*.py',
       '**/*.sh',
-    ], options?.exclude, options?.includeVendored);
+    ], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
 
     for (const file of files) {
       try {

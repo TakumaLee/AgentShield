@@ -1,15 +1,15 @@
-import { ScannerModule, ScanResult, Finding } from '../types';
+import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
   description: 'Tests for 140+ prompt injection attack patterns including jailbreaks, role switches, instruction overrides, data extraction, sandbox escape, session manipulation, and tool injection attempts',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
 
     for (const file of files) {
       try {
@@ -58,6 +58,17 @@ export const promptInjectionTester: ScannerModule = {
             f.description += ' [test/doc file — severity reduced]';
           }
         }
+
+        // Mark test file findings for scoring exclusion
+        if (isTestFileForScoring(file)) {
+          for (const f of fileFindings) {
+            f.isTestFile = true;
+            if (!f.title.startsWith('[TEST]')) {
+              f.title = `[TEST] ${f.title}`;
+            }
+          }
+        }
+
         findings.push(...fileFindings);
       } catch {
         // Skip unreadable files

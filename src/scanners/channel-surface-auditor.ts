@@ -1,6 +1,6 @@
 import * as path from 'path';
-import { ScannerModule, ScanResult, Finding, Severity } from '../types';
-import { findPromptFiles, findConfigFiles, findFiles, readFileContent, isTestOrDocFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, Severity, ScannerOptions } from '../types';
+import { findPromptFiles, findConfigFiles, findFiles, readFileContent, isTestOrDocFile, isTestFileForScoring } from '../utils/file-utils';
 
 export interface ChannelDefinition {
   id: string;
@@ -333,19 +333,19 @@ export const channelSurfaceAuditor: ScannerModule = {
   name: 'Channel Surface Auditor',
   description: 'Detects which external channels the agent controls and checks whether each channel has adequate defenses',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
 
     // Scan both prompt files and config files
-    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
-    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
     const allFiles = [...new Set([...promptFiles, ...configFiles])];
 
     // Also scan source files for code-level evidence of channel integrations
     const sourceFiles = await findFiles(targetPath, [
       '**/*.ts', '**/*.js', '**/*.py', '**/*.sh',
-    ], options?.exclude, options?.includeVendored);
+    ], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
     const allSourceContent = new Map<string, string>();
     for (const file of sourceFiles) {
       try {

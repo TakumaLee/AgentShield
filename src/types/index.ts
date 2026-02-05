@@ -20,6 +20,8 @@ export interface Finding {
   line?: number;
   recommendation: string;
   confidence?: Confidence;
+  /** Tagged as [TEST] — from test files, excluded from scoring */
+  isTestFile?: boolean;
 }
 
 export interface ScanResult {
@@ -52,6 +54,7 @@ export interface ReportSummary {
   grade: string; // A+ ~ F
   score: number; // 0 ~ 100
   scannedFiles: number;
+  ignoredFiles?: number;
   duration: number;
   dimensions?: {
     codeSafety: DimensionScore;
@@ -65,6 +68,8 @@ export interface ScannerOptions {
   exclude?: string[];
   context?: ScanContext;
   includeVendored?: boolean;
+  /** Additional glob patterns from .agentshieldignore */
+  agentshieldIgnorePatterns?: string[];
 }
 
 export interface ScannerModule {

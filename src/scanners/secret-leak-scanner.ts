@@ -1,16 +1,20 @@
-import { ScannerModule, ScanResult, Finding, ScanContext } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isInCommentOrCodeBlock } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isInCommentOrCodeBlock, isTestFileForScoring } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
+import { getGitTrackingStatus } from '../utils/git-utils';
 
 export const secretLeakScanner: ScannerModule = {
   name: 'Secret Leak Scanner',
   description: 'Scans system prompts, tool definitions, and configuration files for hardcoded secrets, API keys, tokens, and sensitive paths',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; context?: ScanContext; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+
+    // Get git tracking status for all files (batch)
+    const gitStatus = getGitTrackingStatus(targetPath, files);
 
     for (const file of files) {
       try {
@@ -38,6 +42,7 @@ export const secretLeakScanner: ScannerModule = {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
             }
+            f.isTestFile = true;
           }
         } else if (isAgentShieldSourceFile(file)) {
           for (const f of fileFindings) {
@@ -61,6 +66,34 @@ export const secretLeakScanner: ScannerModule = {
             f.description += ' [test/doc file — severity reduced]';
           }
         }
+
+        // Git-tracking aware severity adjustment for API keys / tokens
+        const trackingStatus = gitStatus.get(file) || 'unknown';
+        for (const f of fileFindings) {
+          if (isSecretOrTokenFinding(f) && f.severity === 'critical') {
+            if (trackingStatus === 'untracked') {
+              // Local config file, not tracked by git — lower risk
+              f.severity = 'medium';
+              f.description += ' Found in local config (not tracked by git) — ensure file permissions are restricted';
+              f.recommendation = 'This secret is in a local file not tracked by git. Ensure file permissions are restricted and consider using a secret manager.';
+            } else if (trackingStatus === 'tracked') {
+              // Git-tracked — keep CRITICAL
+              f.description += ' Found in git-tracked file — this may be exposed in your repository!';
+              f.recommendation = 'URGENT: This secret is in a git-tracked file and may be exposed in your repository! Remove it immediately, rotate the credential, and use environment variables or a secret manager.';
+            }
+          }
+        }
+
+        // Mark test file findings for scoring exclusion
+        if (isTestFileForScoring(file)) {
+          for (const f of fileFindings) {
+            f.isTestFile = true;
+            if (!f.title.startsWith('[TEST]')) {
+              f.title = `[TEST] ${f.title}`;
+            }
+          }
+        }
+
         findings.push(...fileFindings);
       } catch {
         // Skip unreadable files
@@ -338,6 +371,20 @@ function isDevCredential(line: string): boolean {
   if (!valueMatch) return false;
   const value = valueMatch[1].toLowerCase();
   return DEV_CREDENTIALS.some(dev => value === dev || value.startsWith(dev + '_'));
+}
+
+/**
+ * Check if a finding is related to API keys, tokens, or secrets
+ * (as opposed to hardcoded credentials or sensitive paths).
+ */
+function isSecretOrTokenFinding(finding: Finding): boolean {
+  const secretFindingPatterns = [
+    /api[_-]?key/i,
+    /token/i,
+    /secret/i,
+    /SL-/,  // Secret Leak pattern IDs
+  ];
+  return secretFindingPatterns.some(p => p.test(finding.id) || p.test(finding.title));
 }
 
 function maskValue(text: string, maxLen: number): string {

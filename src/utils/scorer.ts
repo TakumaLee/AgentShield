@@ -98,6 +98,7 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
   let duration = 0;
 
   const allFindings: Finding[] = [];
+  const scoringFindings: Finding[] = []; // Findings that count toward score (excludes test files and Secret Leak INFO)
   const dimensionFindings: Record<'codeSafety' | 'configSafety' | 'defenseScore', Finding[]> = {
     codeSafety: [],
     configSafety: [],
@@ -125,19 +126,31 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
 
       allFindings.push(finding);
 
+      // Determine if this finding should affect scoring
+      const excludeFromScoring =
+        finding.isTestFile === true ||
+        (result.scanner === 'Secret Leak Scanner' && finding.severity === 'info');
+
+      if (!excludeFromScoring) {
+        scoringFindings.push(finding);
+      }
+
       // Scanner breakdown
       scannerBreakdown[result.scanner][finding.severity]++;
 
       // Dimension mapping (default to codeSafety for unknown scanners)
       const dim = DIMENSION_MAP[result.scanner] || 'codeSafety';
-      dimensionFindings[dim].push(finding);
+      if (!excludeFromScoring) {
+        dimensionFindings[dim].push(finding);
+      }
     }
   }
 
   const totalFindings = critical + high + medium + info;
 
   // Overall score uses confidence-weighted counts + interaction penalty
-  const score = calculateScoreFromFindings(allFindings);
+  // Test file findings and Secret Leak Scanner INFO findings are excluded
+  const score = calculateScoreFromFindings(scoringFindings);
   const grade = scoreToGrade(score);
 
   // Per-dimension scores

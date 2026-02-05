@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
+import { loadIgnorePatterns, ignoreToGlobPatterns, shouldIgnoreFile } from './ignore-parser';
 
 export function readFileContent(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8');
@@ -196,10 +197,27 @@ export function isSecurityToolFile(filePath: string): boolean {
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 
-export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
+/** Global counter for files ignored by .agentshieldignore in the current scan */
+let _ignoredByAgentshieldIgnore = 0;
+
+export function getIgnoredFileCount(): number {
+  return _ignoredByAgentshieldIgnore;
+}
+
+export function resetIgnoredFileCount(): void {
+  _ignoredByAgentshieldIgnore = 0;
+}
+
+export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
   const ignoreList = buildIgnoreList(excludePatterns, includeVendored);
+
+  // Add .agentshieldignore patterns to glob ignore list
+  if (agentshieldIgnorePatterns && agentshieldIgnorePatterns.length > 0) {
+    const globPatterns = ignoreToGlobPatterns(agentshieldIgnorePatterns);
+    ignoreList.push(...globPatterns);
+  }
 
   for (const pattern of patterns) {
     const files = await glob(pattern, {
@@ -213,7 +231,7 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
 
   // Deduplicate and filter out oversized files
   const unique = [...new Set(results)];
-  return unique.filter(f => {
+  const filtered = unique.filter(f => {
     try {
       const stat = fs.statSync(f);
       return stat.size <= MAX_FILE_SIZE;
@@ -221,9 +239,25 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
       return false;
     }
   });
+
+  // Post-filter with .agentshieldignore patterns for more precise matching
+  if (agentshieldIgnorePatterns && agentshieldIgnorePatterns.length > 0) {
+    const before = filtered.length;
+    const afterFilter = filtered.filter(f => {
+      const relative = path.relative(absTarget, f);
+      if (shouldIgnoreFile(relative, agentshieldIgnorePatterns)) {
+        _ignoredByAgentshieldIgnore++;
+        return false;
+      }
+      return true;
+    });
+    return afterFilter;
+  }
+
+  return filtered;
 }
 
-export async function findConfigFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
+export async function findConfigFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
   return findFiles(targetPath, [
     '**/*.json',
     '**/*.yaml',
@@ -234,10 +268,10 @@ export async function findConfigFiles(targetPath: string, excludePatterns?: stri
     '**/mcp*.yaml',
     '**/mcp*.yml',
     '**/claude_desktop_config.json',
-  ], excludePatterns, includeVendored);
+  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
 }
 
-export async function findPromptFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean): Promise<string[]> {
+export async function findPromptFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
   // Tier 1: High-signal agent/prompt files (always scan)
   const agentFiles = await findFiles(targetPath, [
     '**/*prompt*',
@@ -258,7 +292,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*settings*.json',
     '**/*settings*.yaml',
     '**/.env*',
-  ], excludePatterns, includeVendored);
+  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
 
   // Tier 2: General files but only in small projects (< 200 files)
   // For large projects, only scan agent-specific files
@@ -271,7 +305,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*.ts',
     '**/*.js',
     '**/*.py',
-  ], excludePatterns, includeVendored);
+  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
 
   // If project is large, only use Tier 1 files
   if (allSourceFiles.length > 200) {
@@ -280,6 +314,20 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
 
   // Small project: scan everything
   return [...new Set([...agentFiles, ...allSourceFiles])];
+}
+
+/**
+ * Check if a file is a test file (tests/, __tests__/, *.test.*, *.spec.*).
+ * Findings from these files should be tagged as [TEST] and excluded from scoring.
+ */
+export function isTestFileForScoring(filePath: string): boolean {
+  const TEST_SCORING_PATTERNS = [
+    /[/\\]tests?[/\\]/i,
+    /[/\\]__tests__[/\\]/i,
+    /\.test\.[^/\\]+$/i,
+    /\.spec\.[^/\\]+$/i,
+  ];
+  return TEST_SCORING_PATTERNS.some(p => p.test(filePath));
 }
 
 // === Context-aware file classification helpers ===

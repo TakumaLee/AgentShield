@@ -1,16 +1,16 @@
 import * as yaml from 'js-yaml';
-import { ScannerModule, ScanResult, Finding, McpServerConfig, McpServerEntry } from '../types';
-import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isCacheOrDataFile } from '../utils/file-utils';
+import { ScannerModule, ScanResult, Finding, McpServerConfig, McpServerEntry, ScannerOptions } from '../types';
+import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isCacheOrDataFile, isTestFileForScoring } from '../utils/file-utils';
 import { DANGEROUS_TOOLS, DANGEROUS_PERMISSIONS } from '../patterns/injection-patterns';
 
 export const mcpConfigAuditor: ScannerModule = {
   name: 'MCP Config Auditor',
   description: 'Audits MCP server configuration files for overly permissive tools, missing access controls, and insecure settings',
 
-  async scan(targetPath: string, options?: { exclude?: string[]; includeVendored?: boolean }): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored);
+    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
 
     // Skip package manifests and non-agent config files
     const SKIP_PATTERNS = [
