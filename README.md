@@ -69,6 +69,25 @@ npm test
 - `src/utils/` — Shared utilities (file walking, etc.)
 - `src/data/` — Static data (IOC blocklists)
 
+## OWASP MCP Top 10 Coverage
+
+Coverage mapping against the [OWASP MCP Top 10](https://github.com/OWASP/www-project-mcp-top-10) (v0.7.0):
+
+| # | Risk | Status | Scanner(s) |
+|---|------|--------|------------|
+| MCP01 | Token Mismanagement & Secret Exposure | ✅ Covered | Secret Leak Scanner |
+| MCP02 | Privilege Escalation via Scope Creep | ✅ Covered | Permission Analyzer, Hygiene Auditor |
+| MCP03 | Tool Poisoning | ✅ Covered | Prompt Injection Tester (tool injection patterns), Skill Auditor |
+| MCP04 | Software Supply Chain Attacks | ✅ Covered | Supply Chain Scanner, Convention Squatting Scanner |
+| MCP05 | Command Injection & Execution | ✅ Covered | Supply Chain Scanner (RCE detection), Red Team Simulator |
+| MCP06 | Prompt Injection via Contextual Payloads | ✅ Covered | Prompt Injection Tester (140+ patterns) |
+| MCP07 | Insufficient Authentication & Authorization | 🟡 Partial | MCP Config Auditor, Agent Config Auditor (config-level checks; no runtime auth enforcement) |
+| MCP08 | Insecure Data Handling | 🟡 Partial | Defense Analyzer, Environment Isolation Auditor (data flow analysis; no encryption validation) |
+| MCP09 | Logging & Monitoring Gaps | 🟡 Partial | Agent Config Auditor, Hygiene Auditor (checks for missing logging config; no log completeness analysis) |
+| MCP10 | Server-Side Request Forgery (SSRF) | 🔲 Planned | — |
+
+**Legend:** ✅ Covered — 🟡 Partial — 🔲 Planned
+
 ## License
 
 MIT
