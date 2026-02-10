@@ -2,9 +2,9 @@
 
 # 🛡️ AgentShield
 
-**Like `npm audit`, but for AI Agents and MCP Servers.**
+**When your AI agent has tool access, prompt injection is RCE.**
 
-Scan your AI agent configs, system prompts, and MCP setups for security vulnerabilities — in seconds.
+Scan agent configs, system prompts, and MCP setups for security vulnerabilities — before they reach production.
 
 [![npm version](https://img.shields.io/npm/v/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
 [![npm downloads](https://img.shields.io/npm/dm/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
@@ -119,6 +119,17 @@ npx aiagentshield scan ./my-agent/ --json -o report.json
 | Runs locally (no cloud) | ✅ | ✅ | ✅ |
 | Multilingual patterns | ✅ | ❌ | ❌ |
 | Letter grade scoring | ✅ | ❌ | ❌ |
+
+## 💡 Why AgentShield?
+
+AI agents in 2026 operate with real tool access — file systems, APIs, databases, code execution. A single compromised skill or misconfigured MCP server can escalate to full system access. No exploit chain required.
+
+- **Prompt injection = RCE.** When agents can call tools, a successful injection isn't just a chatbot jailbreak — it's arbitrary code execution on your infrastructure.
+- **Supply chain is the new attack vector.** Agents pull skills from registries and connect to MCP servers. One poisoned package = game over.
+- **Zero Trust for agent tooling.** Every skill, every MCP server, every config should be verified before it gets tool access.
+- **Defense in depth works.** Research on 300K adversarial prompts shows multi-layer scanning drops attack success from 7% to 0.003%.
+
+AgentShield gives you that scanning layer — 10 scanners, 140+ attack patterns, zero cloud dependencies, CI/CD-ready in one command.
 
 ## 🎯 Who is this for?
 
