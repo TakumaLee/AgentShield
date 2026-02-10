@@ -25,6 +25,23 @@ Detects skill supply chain poisoning:
 
 Detects naming impostor attacks — packages that mimic trusted skill names via typosquatting, prefix hijacking, or namespace confusion.
 
+### 🛡️ DXT Security Scanner
+
+Scans for insecure Claude Desktop Extension (DXT) configurations. DXT extensions run unsandboxed with full system privileges — a malicious calendar invite or email can trigger arbitrary code execution ([OWASP MCP01: Tool Poisoning](https://owasp.org/www-project-top-10-for-large-language-model-applications/) / MCP02: Trust Boundary violations).
+
+| Rule | Severity | Threat |
+|------|----------|--------|
+| DXT-001 | CRITICAL | Unsandboxed extension with external data source + local executor |
+| DXT-002 | HIGH | Unrestricted file system access |
+| DXT-003 | HIGH | Unrestricted network access |
+| DXT-004 | HIGH | Code execution permission enabled |
+| DXT-005 | HIGH | Extension running without sandboxing |
+| DXT-006 | HIGH | Unsigned/unverified extension |
+| DXT-007 | MEDIUM | Signed but unverified signature |
+| DXT-008 | MEDIUM | File system + network combo without sandbox |
+| DXT-009 | MEDIUM | External data source without sandbox |
+| DXT-010 | MEDIUM | Unrestricted executor |
+
 ### 🧹 Hygiene Auditor
 
 Audits agent configuration hygiene — overly broad permissions, missing access controls, and risky defaults that expand an agent's attack surface.
