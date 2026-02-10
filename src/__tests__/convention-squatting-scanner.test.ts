@@ -1,0 +1,306 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import {
+  ConventionSquattingScanner,
+  isTLDCollision,
+  domainResolves,
+  KNOWN_CONVENTION_FILES,
+} from '../scanners/convention-squatting-scanner';
+
+function createTempDir(files: Record<string, string>): string {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-squat-'));
+  for (const [name, content] of Object.entries(files)) {
+    const filePath = path.join(tmpDir, name);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content);
+  }
+  return tmpDir;
+}
+
+function cleanup(dir: string): void {
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+describe('isTLDCollision', () => {
+  test('detects .md as TLD collision', () => {
+    expect(isTLDCollision('README.md')).toBe(true);
+  });
+
+  test('detects .ai as TLD collision', () => {
+    expect(isTLDCollision('config.ai')).toBe(true);
+  });
+
+  test('does not flag .txt', () => {
+    expect(isTLDCollision('notes.txt')).toBe(false);
+  });
+
+  test('does not flag .yaml', () => {
+    expect(isTLDCollision('config.yaml')).toBe(false);
+  });
+});
+
+describe('domainResolves', () => {
+  test('returns true when resolver returns addresses', async () => {
+    const mockResolver = async () => ['1.2.3.4'];
+    expect(await domainResolves('readme.md', mockResolver)).toBe(true);
+  });
+
+  test('returns false when resolver throws', async () => {
+    const mockResolver = async () => { throw new Error('NXDOMAIN'); };
+    expect(await domainResolves('nonexistent.md', mockResolver)).toBe(false);
+  });
+
+  test('returns false when resolver returns empty', async () => {
+    const mockResolver = async () => [] as string[];
+    expect(await domainResolves('test.md', mockResolver)).toBe(false);
+  });
+});
+
+describe('ConventionSquattingScanner', () => {
+  let scanner: ConventionSquattingScanner;
+
+  beforeAll(() => {
+    scanner = new ConventionSquattingScanner();
+  });
+
+  // --- SQUAT-001: TLD Collision ---
+
+  describe('SQUAT-001: Convention Filename TLD Collision', () => {
+    test('flags .md files as TLD collisions', async () => {
+      const dir = createTempDir({ 'AGENTS.md': '# Agents', 'README.md': '# Readme' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(2);
+        expect(matches.every((m) => m.message.includes('TLD collision'))).toBe(true);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('flags known convention files with MEDIUM severity', async () => {
+      const dir = createTempDir({ 'SOUL.md': '# Soul' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(1);
+        expect(matches[0].severity).toBe('MEDIUM');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('flags unknown .md files with LOW severity', async () => {
+      const dir = createTempDir({ 'CUSTOM.md': '# Custom' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(1);
+        expect(matches[0].severity).toBe('LOW');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('flags .sh files as TLD collisions', async () => {
+      const dir = createTempDir({ 'setup.sh': '#!/bin/bash\necho hi' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(1);
+        expect(matches[0].message).toContain('.sh');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag .txt or .yaml files', async () => {
+      const dir = createTempDir({ 'notes.txt': 'hello', 'config.yaml': 'key: val' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- SQUAT-002: URL Resolution Risk ---
+
+  describe('SQUAT-002: URL Resolution Risk', () => {
+    test('detects fetch() with filename-like argument', async () => {
+      const dir = createTempDir({
+        'agent.js': 'const data = fetch("AGENTS.md").then(r => r.text());',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-002');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].severity).toBe('HIGH');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects axios.get with filename-like argument', async () => {
+      const dir = createTempDir({
+        'loader.ts': 'const res = axios.get("README.md");',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-002');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects requests.get in Python files', async () => {
+      const dir = createTempDir({
+        'loader.py': 'resp = requests.get("SOUL.md")',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-002');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('no false positive on fs.readFileSync', async () => {
+      const dir = createTempDir({
+        'safe.js': 'const data = fs.readFileSync("AGENTS.md", "utf-8");',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-002');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- SQUAT-003: Known Squatted Domains (DNS) ---
+
+  describe('SQUAT-003: Known Squatted Domains', () => {
+    test('reports domains that resolve via DNS', async () => {
+      const mockResolver = async (host: string) => {
+        if (host === 'readme.md' || host === 'heartbeat.md') return ['93.184.216.34'];
+        throw new Error('NXDOMAIN');
+      };
+      const dnsScanner = new ConventionSquattingScanner({ resolver: mockResolver, dnsCheck: true });
+      const dir = createTempDir({ 'dummy.txt': 'x' });
+      try {
+        const result = await dnsScanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-003');
+        expect(matches.length).toBe(2);
+        expect(matches.every((m) => m.severity === 'CRITICAL')).toBe(true);
+        const domains = matches.map((m) => m.message);
+        expect(domains.some((d) => d.includes('readme.md'))).toBe(true);
+        expect(domains.some((d) => d.includes('heartbeat.md'))).toBe(true);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not report domains that do not resolve', async () => {
+      const mockResolver = async () => { throw new Error('NXDOMAIN'); };
+      const dnsScanner = new ConventionSquattingScanner({ resolver: mockResolver, dnsCheck: true });
+      const dir = createTempDir({ 'dummy.txt': 'x' });
+      try {
+        const result = await dnsScanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-003');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('skips DNS check when dnsCheck is false (default)', async () => {
+      const dir = createTempDir({ 'README.md': '# hi' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-003');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- SQUAT-004: Heartbeat/Periodic Read Risk ---
+
+  describe('SQUAT-004: Heartbeat/Periodic Read Risk', () => {
+    test('flags HEARTBEAT.md with extra heartbeat finding', async () => {
+      const dir = createTempDir({ 'HEARTBEAT.md': '- check email' });
+      try {
+        const result = await scanner.scan(dir);
+        const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001' && f.file.includes('HEARTBEAT'));
+        const squat004 = result.findings.filter((f) => f.rule === 'SQUAT-004');
+        expect(squat001.length).toBe(1);
+        expect(squat001[0].severity).toBe('HIGH');
+        expect(squat004.length).toBe(1);
+        expect(squat004[0].severity).toBe('HIGH');
+        expect(squat004[0].message).toContain('persistent injection');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag non-heartbeat files with SQUAT-004', async () => {
+      const dir = createTempDir({ 'README.md': '# hi' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-004');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- Integration ---
+
+  describe('Integration', () => {
+    test('scans a realistic agent workspace', async () => {
+      const dir = createTempDir({
+        'AGENTS.md': '# Agent instructions',
+        'SOUL.md': '# Identity',
+        'MEMORY.md': '# Memory',
+        'HEARTBEAT.md': '- check inbox',
+        'TOOLS.md': '# Tools',
+        'src/loader.js': 'const soul = fetch("SOUL.md").then(r => r.text());',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        // Should have TLD collision findings for all .md files
+        const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        // 5 .md files + 1 .js file = 6 TLD collisions
+        expect(squat001.length).toBe(6);
+        // Should have URL resolution finding
+        const squat002 = result.findings.filter((f) => f.rule === 'SQUAT-002');
+        expect(squat002.length).toBe(1);
+        // Should have heartbeat finding
+        const squat004 = result.findings.filter((f) => f.rule === 'SQUAT-004');
+        expect(squat004.length).toBe(1);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('reports filesScanned count', async () => {
+      const dir = createTempDir({ 'A.md': 'a', 'B.md': 'b', 'C.txt': 'c' });
+      try {
+        const result = await scanner.scan(dir);
+        expect(result.filesScanned).toBe(3);
+        expect(result.scanner).toBe('ConventionSquattingScanner');
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+});

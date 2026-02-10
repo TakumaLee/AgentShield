@@ -1,220 +1,74 @@
-<div align="center">
+# AgentShield
 
-# 🛡️ AgentShield
+[![npm version](https://img.shields.io/npm/v/aiagentshield.svg)](https://www.npmjs.com/package/aiagentshield)
+[![license](https://img.shields.io/npm/l/aiagentshield.svg)](https://github.com/TakumaLee/AgentShield/blob/main/LICENSE)
+[![tests](https://img.shields.io/github/actions/workflow/status/TakumaLee/AgentShield/ci.yml?label=tests)](https://github.com/TakumaLee/AgentShield/actions)
 
-**When your AI agent has tool access, prompt injection is RCE.**
+**When your AI agent has tool access, prompt injection is RCE.** AgentShield scans agent skill packages for supply chain poisoning, naming attacks, and configuration risks — before they reach production.
 
-Scan agent configs, system prompts, and MCP setups for security vulnerabilities — before they reach production.
+## Scanners
 
-[![npm version](https://img.shields.io/npm/v/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
-[![npm downloads](https://img.shields.io/npm/dm/aiagentshield.svg?style=flat-square)](https://www.npmjs.com/package/aiagentshield)
-[![license](https://img.shields.io/npm/l/aiagentshield.svg?style=flat-square)](./LICENSE)
-[![tests](https://img.shields.io/badge/tests-840%2B-brightgreen?style=flat-square)]()
+### 🔗 Supply Chain Scanner
 
-</div>
+Detects skill supply chain poisoning:
 
----
+| Rule | Threat |
+|------|--------|
+| SUPPLY-001 | Base64 hidden commands |
+| SUPPLY-002 | Remote code execution patterns |
+| SUPPLY-003 | IOC blocklist matching |
+| SUPPLY-004 | Credential theft |
+| SUPPLY-005 | Data exfiltration |
+| SUPPLY-006 | Persistence mechanisms |
 
-```
-$ npx aiagentshield scan ./my-agent/
+### 🎭 Convention Squatting Scanner
 
-╔══════════════════════════════════════════════════════════╗
-║  🛡️  AgentShield Security Report                        ║
-╚══════════════════════════════════════════════════════════╝
+Detects naming impostor attacks — packages that mimic trusted skill names via typosquatting, prefix hijacking, or namespace confusion.
 
-  Target:    ./my-agent/
-  Version:   0.3.0
+### 🧹 Hygiene Auditor
 
-  ── Prompt Injection Tester ──────────────────────────────
-  🔴 CRITICAL  jailbreak: Direct instruction override
-     📁 system-prompt.md:15
-     💡 Add input validation to detect and reject jailbreak attempts.
+Audits agent configuration hygiene — overly broad permissions, missing access controls, and risky defaults that expand an agent's attack surface.
 
-  🟠 HIGH      data-extraction: Tool/capability enumeration
-     📁 agent-config.json:8
-     💡 Never include sensitive data in system prompts.
+## Why AgentShield?
 
-  ── Secret Leak Scanner ──────────────────────────────────
-  🔴 CRITICAL  Potential secret: OpenAI API key pattern
-     📁 config.json:3
-     💡 Remove hardcoded secrets. Use environment variables instead.
+AI agents in 2026 operate with real tool access: file systems, APIs, databases, code execution. A single compromised skill package can escalate to full system access — no exploit chain required.
 
-  ─────────────────────────────────────────────────────────
-
-  Security Grade: C+ (77/100)
-
-  Findings: 🔴 1 Critical  🟠 2 High  🟡 3 Medium
-  Files Scanned: 24 │ Duration: 156ms
-
-  ⚠️  CRITICAL issues found! Address these immediately.
-```
-
-## ⚡ Quick Start
-
-```bash
-# Scan any directory — zero config needed
-npx aiagentshield scan .
-
-# Or install globally
-npm install -g aiagentshield
-aiagentshield scan ./my-agent/ --json
-```
-
-That's it. No API keys. No cloud. Everything runs locally.
-
-## 🔍 10 Security Scanners
-
-| # | Scanner | What it catches |
-|---|---------|----------------|
-| 🧪 | **Prompt Injection Tester** | 140+ attack patterns — jailbreaks, role switches, multilingual attacks |
-| 🔧 | **MCP Config Auditor** | Dangerous commands, wildcard access, missing allowlists |
-| 🔑 | **Secret Leak Scanner** | API keys, tokens, passwords, connection strings in configs |
-| 🔐 | **Permission Analyzer** | Over-privileged configs, missing rate limits, no auth |
-| 🛡️ | **Defense Analyzer** | Missing input sanitization, no output filtering, no sandboxing |
-| 🧩 | **Skill Auditor** | Dangerous tool exposure, missing skill isolation |
-| 🎯 | **Red Team Simulator** | 7 simulated attack vectors including cross-channel spoofing |
-| 📡 | **Channel Surface Auditor** | Email, social media, Telegram, Discord — per-channel defense checks |
-| ⚙️ | **Agent Config Auditor** | Gateway exposure, plaintext bot tokens, open DM policies |
-| 🏗️ | **Environment Isolation Auditor** | Container/VM detection, file permissions, dangerous Docker mounts, resource limits |
-
-## 📊 Security Grades
-
-Your agent gets a score from **0–100**, mapped to a letter grade:
-
-| Grade | Score | What it means |
-|-------|-------|---------------|
-| **A+** | 97–100 | Fort Knox. Ship it. |
-| **A / A-** | 90–96 | Solid. Minor polish needed. |
-| **B+** to **B-** | 80–89 | Decent, but there's room to harden. |
-| **C+** to **C-** | 70–79 | Real issues. Fix before shipping. |
-| **D+** to **D-** | 60–69 | Significant vulnerabilities. |
-| **F** | < 60 | 🚨 Stop everything. Fix now. |
-
-## 🏗️ CI/CD Integration
-
-```bash
-# Fails with exit code 2 on critical, 1 on high
-npx aiagentshield scan ./my-agent/ --json -o report.json
-```
-
-| Exit Code | Meaning |
-|-----------|---------|
-| `0` | All clear |
-| `1` | High severity findings |
-| `2` | Critical severity findings |
-
-## 🆚 How does it compare?
-
-| Feature | AgentShield | MCP-Scan | Manual Audit |
-|---------|:-----------:|:--------:|:------------:|
-| Prompt injection detection (140+ patterns) | ✅ | ❌ | 🔶 |
-| MCP config auditing | ✅ | ✅ | 🔶 |
-| Secret leak scanning | ✅ | ❌ | 🔶 |
-| Permission analysis | ✅ | ❌ | 🔶 |
-| Defense layer analysis | ✅ | ❌ | 🔶 |
-| Red team simulation | ✅ | ❌ | ❌ |
-| Channel surface auditing | ✅ | ❌ | ❌ |
-| Agent config auditing | ✅ | ❌ | 🔶 |
-| CI/CD integration | ✅ | ✅ | ❌ |
-| Runs locally (no cloud) | ✅ | ✅ | ✅ |
-| Multilingual patterns | ✅ | ❌ | ❌ |
-| Letter grade scoring | ✅ | ❌ | ❌ |
-
-## 💡 Why AgentShield?
-
-AI agents in 2026 operate with real tool access — file systems, APIs, databases, code execution. A single compromised skill or misconfigured MCP server can escalate to full system access. No exploit chain required.
-
-- **Prompt injection = RCE.** When agents can call tools, a successful injection isn't just a chatbot jailbreak — it's arbitrary code execution on your infrastructure.
-- **Supply chain is the new attack vector.** Agents pull skills from registries and connect to MCP servers. One poisoned package = game over.
-- **Zero Trust for agent tooling.** Every skill, every MCP server, every config should be verified before it gets tool access.
+- **Supply chain is the new attack vector.** Agents pull skills from registries. One poisoned package = game over.
+- **Zero Trust for agent tooling.** Every skill should be verified before it gets tool access.
 - **Defense in depth works.** Research on 300K adversarial prompts shows multi-layer scanning drops attack success from 7% to 0.003%.
 
-AgentShield gives you that scanning layer — 10 scanners, 140+ attack patterns, zero cloud dependencies, CI/CD-ready in one command.
+AgentShield gives you that scanning layer — lightweight, pluggable, and CI/CD-ready.
 
-## 🎯 Who is this for?
-
-- **AI Agent developers** — Catch security issues before your users do
-- **MCP server authors** — Validate your server config ships safe
-- **Security teams** — Automated audits for AI-powered products
-- **Open source maintainers** — Add `agentshield` to CI and show a security badge
-
-## 🛠️ Advanced Usage
+## Usage
 
 ```bash
-# Run specific scanners only
-aiagentshield scan ./my-agent/ -s prompt secret
+# Scan a directory
+npx aiagentshield ./path/to/agent
 
-# Verbose mode
-aiagentshield scan ./my-agent/ -v
-
-# Save JSON report
-aiagentshield scan ./my-agent/ --json -o report.json
+# With external IOC blocklist
+npx aiagentshield ./path/to/agent ./custom-ioc-blocklist.json
 ```
 
-<details>
-<summary><strong>📋 Full Scanner Details</strong></summary>
+## IOC Blocklist
 
-### Prompt Injection Tester
-Scans for **140+ attack patterns** across 11 categories: jailbreak, role switch, instruction override, data extraction, encoding tricks, social engineering, hidden instructions, emotional manipulation, false prior agreement, identity spoofing, and multilingual attacks (Chinese, Japanese, French, Spanish, German, Korean, Arabic, Russian).
+The built-in blocklist is at `src/data/ioc-blocklist.json`. You can provide an external JSON file with the same format to extend it.
 
-### MCP Config Auditor
-Checks MCP server configurations for dangerous commands (`bash`, `python`, `node`), wildcard path access, missing allowlists/denylists, hardcoded secrets in env vars, overly permissive tools, and URLs with embedded credentials.
-
-### Secret Leak Scanner
-Detects API keys (OpenAI, Anthropic, AWS, Google, GitHub, Slack, Stripe), bearer tokens, JWTs, private keys, bot tokens, database connection strings, sensitive file paths, hardcoded passwords, and JSON config fields with real-looking values.
-
-### Permission Analyzer
-Identifies wildcard permissions, unrestricted filesystem access, missing rate limiting, missing authentication, missing audit trails, and over-privileged prompt grants.
-
-### Defense Analyzer
-Checks for input sanitization, system prompt hardening (instruction hierarchy, role-lock), output filtering, sandbox/permission boundaries, authentication mechanisms, and canary tokens/tripwires.
-
-### Skill Auditor
-Audits skill/plugin permission boundaries, dangerous tool exposure, and skill isolation/sandboxing.
-
-### Red Team Simulator
-Static analysis simulating 7 attack vectors: role confusion, instruction hierarchy bypass, missing rejection patterns, memory poisoning, tool abuse, multi-turn manipulation, and cross-channel identity spoofing.
-
-### Channel Surface Auditor
-Detects external channels (email, social media, Telegram, Discord, browser, filesystem, API, database, payment) and checks for channel-specific defenses.
-
-### Agent Config Auditor
-Audits AI Agent platform config files for gateway exposure, missing auth, no sender restrictions, open DM policies, plaintext bot tokens, default ports, missing logging, and missing redaction settings.
-
-### Environment Isolation Auditor
-Checks the runtime environment for security isolation: container/VM detection (Docker, LXC, VMware, etc.), sensitive config file permissions (world-readable checks), network isolation (docker-compose networks, Dockerfile EXPOSE), resource limits (mem_limit, cpus), snapshot/rollback capability (git, Dockerfile), and dangerous Docker mounts (docker.sock, privileged mode, root/home mounts).
-
-</details>
-
-## 🧪 Testing
+## Development
 
 ```bash
-npm test                    # Run all 840+ tests
-npm test -- --coverage      # With coverage report
+npm install
+npm run build
+npm test
 ```
 
-## 🤝 Contributing
+## Architecture
 
-Contributions are welcome! Whether it's a new scanner, more injection patterns, or bug fixes — open a PR.
+- `src/types.ts` — Core type definitions (Scanner, Finding, ScanResult)
+- `src/scanner-registry.ts` — Scanner registration and orchestration
+- `src/scanners/` — Individual scanner implementations
+- `src/utils/` — Shared utilities (file walking, etc.)
+- `src/data/` — Static data (IOC blocklists)
 
-1. Fork the repo
-2. Create your branch (`git checkout -b feat/amazing-scanner`)
-3. Commit your changes (`git commit -m 'Add amazing scanner'`)
-4. Push (`git push origin feat/amazing-scanner`)
-5. Open a Pull Request
+## License
 
-## 📄 License
-
-[MIT](./LICENSE) — use it, fork it, ship it.
-
----
-
-<div align="center">
-
-**If AgentShield helped you, [give it a ⭐](https://github.com/TakumaLee/AgentShield)**
-
-It helps others find it and makes us mass-produce serotonin.
-
-<sub>Built with 🐈‍⬛ by Ruri</sub>
-
-</div>
+MIT
