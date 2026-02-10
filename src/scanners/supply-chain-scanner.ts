@@ -65,7 +65,7 @@ export function loadIOC(externalPath?: string): IOCBlocklist {
 
 const base64Rule: Rule = {
   id: 'SUPPLY-001',
-  severity: 'HIGH',
+  severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     let match: RegExpExecArray | null;
@@ -78,7 +78,7 @@ const base64Rule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-001',
-          severity: 'HIGH',
+          severity: 'high',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
           message: 'Suspicious Base64-encoded command detected',
@@ -103,7 +103,7 @@ const RCE_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
 
 const rceRule: Rule = {
   id: 'SUPPLY-002',
-  severity: 'CRITICAL',
+  severity: 'critical',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     for (const { pattern, desc } of RCE_PATTERNS) {
@@ -113,7 +113,7 @@ const rceRule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-002',
-          severity: 'CRITICAL',
+          severity: 'critical',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
           message: `Remote code execution: ${desc}`,
@@ -128,7 +128,7 @@ const rceRule: Rule = {
 function createIOCRule(ioc: IOCBlocklist): Rule {
   return {
     id: 'SUPPLY-003',
-    severity: 'CRITICAL',
+    severity: 'critical',
     check(file: FileEntry): Finding[] {
       const findings: Finding[] = [];
       for (const ip of ioc.malicious_ips) {
@@ -137,7 +137,7 @@ function createIOCRule(ioc: IOCBlocklist): Rule {
           findings.push({
             scanner: 'SupplyChainScanner',
             rule: 'SUPPLY-003',
-            severity: 'CRITICAL',
+            severity: 'critical',
             file: file.relativePath,
             line: findLineNumber(file.content, idx),
             message: `Known malicious IP detected: ${ip}`,
@@ -152,7 +152,7 @@ function createIOCRule(ioc: IOCBlocklist): Rule {
           findings.push({
             scanner: 'SupplyChainScanner',
             rule: 'SUPPLY-003',
-            severity: 'CRITICAL',
+            severity: 'critical',
             file: file.relativePath,
             line: findLineNumber(file.content, idx),
             message: `Known malicious domain detected: ${domain}`,
@@ -176,7 +176,7 @@ const CREDENTIAL_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
 
 const credentialRule: Rule = {
   id: 'SUPPLY-004',
-  severity: 'CRITICAL',
+  severity: 'critical',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     for (const { pattern, desc } of CREDENTIAL_PATTERNS) {
@@ -186,7 +186,7 @@ const credentialRule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-004',
-          severity: 'CRITICAL',
+          severity: 'critical',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
           message: `Credential theft: ${desc}`,
@@ -208,7 +208,7 @@ const EXFIL_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
 
 const exfilRule: Rule = {
   id: 'SUPPLY-005',
-  severity: 'HIGH',
+  severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     for (const { pattern, desc } of EXFIL_PATTERNS) {
@@ -218,7 +218,7 @@ const exfilRule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-005',
-          severity: 'HIGH',
+          severity: 'high',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
           message: `Data exfiltration: ${desc}`,
@@ -241,7 +241,7 @@ const PERSISTENCE_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
 
 const persistenceRule: Rule = {
   id: 'SUPPLY-006',
-  severity: 'HIGH',
+  severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     for (const { pattern, desc } of PERSISTENCE_PATTERNS) {
@@ -251,7 +251,7 @@ const persistenceRule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-006',
-          severity: 'HIGH',
+          severity: 'high',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
           message: `Persistence mechanism: ${desc}`,

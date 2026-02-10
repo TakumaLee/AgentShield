@@ -56,7 +56,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Environment Isolation');
         expect(finding).toBeDefined();
-        expect(finding!.severity).toBe('HIGH');
+        expect(finding!.severity).toBe('high');
         // On a dev machine this will likely FAIL; on CI it may PASS
         expect(['PASS', 'FAIL']).toContain(finding!.status);
       } finally {
@@ -74,7 +74,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'File Access Scope');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('HIGH');
+        expect(finding!.severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -126,7 +126,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Shell/Exec Access');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('HIGH');
+        expect(finding!.severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -167,7 +167,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Credential Exposure');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('CRITICAL');
+        expect(finding!.severity).toBe('critical');
       } finally {
         cleanup(dir);
       }
@@ -235,7 +235,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Browser Profile Isolation');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('MEDIUM');
+        expect(finding!.severity).toBe('medium');
       } finally {
         cleanup(dir);
       }
@@ -275,7 +275,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Cost Controls');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('MEDIUM');
+        expect(finding!.severity).toBe('medium');
       } finally {
         cleanup(dir);
       }
@@ -327,7 +327,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Trading/Financial Safeguards');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('HIGH');
+        expect(finding!.severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -381,7 +381,7 @@ describe('HygieneAuditor', () => {
         const finding = report.findings.find((f) => f.checkName === 'Convention File Squatting');
         expect(finding).toBeDefined();
         expect(finding!.status).toBe('WARN');
-        expect(finding!.severity).toBe('MEDIUM');
+        expect(finding!.severity).toBe('medium');
         expect(finding!.description).toContain('.md');
         expect(finding!.description).toContain('Moldova');
       } finally {
@@ -399,7 +399,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Prompt Injection Defenses');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('HIGH');
+        expect(finding!.severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -461,7 +461,7 @@ describe('HygieneAuditor', () => {
         const report = await auditor.audit(dir);
         const finding = report.findings.find((f) => f.checkName === 'Monitoring & Kill Switch');
         expect(finding!.status).toBe('FAIL');
-        expect(finding!.severity).toBe('MEDIUM');
+        expect(finding!.severity).toBe('medium');
       } finally {
         cleanup(dir);
       }
@@ -518,23 +518,23 @@ describe('HygieneAuditor', () => {
   describe('calculateHygieneScore', () => {
     test('returns 100 for all PASS', () => {
       const findings: HygieneFinding[] = [
-        { checkName: 'A', severity: 'HIGH', status: 'PASS', description: '', recommendation: '' },
-        { checkName: 'B', severity: 'MEDIUM', status: 'PASS', description: '', recommendation: '' },
+        { checkName: 'A', severity: 'high', status: 'PASS', description: '', recommendation: '' },
+        { checkName: 'B', severity: 'medium', status: 'PASS', description: '', recommendation: '' },
       ];
       expect(calculateHygieneScore(findings)).toBe(100);
     });
 
     test('returns 0 for all FAIL', () => {
       const findings: HygieneFinding[] = [
-        { checkName: 'A', severity: 'CRITICAL', status: 'FAIL', description: '', recommendation: '' },
-        { checkName: 'B', severity: 'HIGH', status: 'FAIL', description: '', recommendation: '' },
+        { checkName: 'A', severity: 'critical', status: 'FAIL', description: '', recommendation: '' },
+        { checkName: 'B', severity: 'high', status: 'FAIL', description: '', recommendation: '' },
       ];
       expect(calculateHygieneScore(findings)).toBe(0);
     });
 
     test('WARN gives partial deduction', () => {
       const findings: HygieneFinding[] = [
-        { checkName: 'A', severity: 'HIGH', status: 'WARN', description: '', recommendation: '' },
+        { checkName: 'A', severity: 'high', status: 'WARN', description: '', recommendation: '' },
       ];
       const score = calculateHygieneScore(findings);
       expect(score).toBe(50);
@@ -546,8 +546,8 @@ describe('HygieneAuditor', () => {
 
     test('mixed results give weighted score', () => {
       const findings: HygieneFinding[] = [
-        { checkName: 'A', severity: 'CRITICAL', status: 'FAIL', description: '', recommendation: '' },
-        { checkName: 'B', severity: 'LOW', status: 'PASS', description: '', recommendation: '' },
+        { checkName: 'A', severity: 'critical', status: 'FAIL', description: '', recommendation: '' },
+        { checkName: 'B', severity: 'info', status: 'PASS', description: '', recommendation: '' },
       ];
       const score = calculateHygieneScore(findings);
       expect(score).toBeGreaterThan(0);

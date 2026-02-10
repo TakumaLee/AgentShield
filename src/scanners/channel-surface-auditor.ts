@@ -474,7 +474,7 @@ export const channelSurfaceAuditor: ScannerModule = {
     // Downgrade channels without code evidence to info
     // (detected only via natural language mention, not actual integration)
     for (const f of channelFindings) {
-      const channelId = f.id.split('-').slice(0, 2).join('-'); // e.g. CH-BROWSER
+      const channelId = f.id!.split('-').slice(0, 2).join('-'); // e.g. CH-BROWSER
       if (!channelsWithCodeEvidence.has(channelId) && f.severity !== 'info') {
         f.severity = 'info';
         f.description += ' [no code-level integration evidence found — mention only]';

@@ -63,8 +63,8 @@ export const promptInjectionTester: ScannerModule = {
         if (isTestFileForScoring(file)) {
           for (const f of fileFindings) {
             f.isTestFile = true;
-            if (!f.title.startsWith('[TEST]')) {
-              f.title = `[TEST] ${f.title}`;
+            if (!f.title!.startsWith('[TEST]')) {
+              f.title! = `[TEST] ${f.title!}`;
             }
           }
         }
@@ -98,7 +98,7 @@ export function scanContent(content: string, filePath?: string): Finding[] {
       if (attackPattern.pattern.test(lines[i])) {
         // Check for duplicates
         const existingId = `${attackPattern.id}-${filePath}-${i + 1}`;
-        if (!findings.some(f => f.id === existingId)) {
+        if (!findings.some(f => f.id! === existingId)) {
           let severity = attackPattern.severity;
           let note = '';
 
@@ -138,7 +138,7 @@ export function scanContent(content: string, filePath?: string): Finding[] {
     if (attackPattern.pattern.flags.includes('s') || attackPattern.pattern.source.includes('\\n')) {
       // Only re-test patterns that are likely multi-line
       const existingPrefix = `${attackPattern.id}-${filePath}-`;
-      if (findings.some(f => f.id.startsWith(existingPrefix))) continue;
+      if (findings.some(f => f.id!.startsWith(existingPrefix))) continue;
 
       if (attackPattern.pattern.test(content)) {
         let severity = attackPattern.severity;
@@ -148,7 +148,7 @@ export function scanContent(content: string, filePath?: string): Finding[] {
           note = ' [system prompt/rules file — defensive content, not an attack vector]';
         }
         const existingId = `${attackPattern.id}-${filePath}-0`;
-        if (!findings.some(f => f.id === existingId)) {
+        if (!findings.some(f => f.id! === existingId)) {
           findings.push({
             id: existingId,
             scanner: 'prompt-injection-tester',

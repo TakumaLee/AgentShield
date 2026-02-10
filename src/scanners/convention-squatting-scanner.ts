@@ -97,32 +97,40 @@ export class ConventionSquattingScanner implements Scanner {
         const isKnown = KNOWN_CONVENTION_FILES.includes(domain);
         const isHeartbeat = HEARTBEAT_FILENAMES.has(domain);
 
-        const severity: Severity = isHeartbeat ? 'HIGH' : isKnown ? 'MEDIUM' : 'LOW';
+        const severity: Severity = isHeartbeat ? 'high' : isKnown ? 'medium' : 'info';
         const rec = isHeartbeat
           ? 'CRITICAL: This file is read periodically — a squatted domain would enable persistent injection. Use absolute local paths and validate file source is local filesystem, not network.'
           : 'Filename resolves as a valid domain. Ensure agent reads via local fs path, not URL resolution. Add integrity checks (hash verification) for convention files.';
 
         findings.push({
+          id: 'SQUAT-001',
           scanner: this.name,
           rule: 'SQUAT-001',
           severity,
+          title: 'Convention Filename TLD Collision',
+          description: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})`,
           file: file.relativePath,
           line: 0,
           message: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})`,
           evidence: `${domain} — ${rec}`,
+          recommendation: rec,
         });
 
         // Rule 4: Heartbeat/Periodic Read Risk (additional finding)
         if (isHeartbeat) {
           findings.push({
+            id: 'SQUAT-004',
             scanner: this.name,
             rule: 'SQUAT-004',
-            severity: 'HIGH',
+            severity: 'high',
+            title: 'Heartbeat File Domain Squatting Risk',
+            description: `Heartbeat file "${basename}" is highest risk for persistent injection via domain squatting`,
             file: file.relativePath,
             line: 0,
             message: `Heartbeat file "${basename}" is highest risk for persistent injection via domain squatting`,
             evidence:
               'Files read periodically can be hijacked if resolved via URL. Use absolute local path, verify file hash, ensure fs-only access.',
+            recommendation: 'Use absolute local path, verify file hash, ensure fs-only access.',
           });
         }
       }
@@ -135,13 +143,17 @@ export class ConventionSquattingScanner implements Scanner {
         let match: RegExpExecArray | null;
         while ((match = regex.exec(file.content)) !== null) {
           findings.push({
+            id: 'SQUAT-002',
             scanner: this.name,
             rule: 'SQUAT-002',
-            severity: 'HIGH',
+            severity: 'high',
+            title: 'URL Resolution Risk',
+            description: `URL resolution risk: ${desc}`,
             file: file.relativePath,
             line: findLineNumber(file.content, match.index),
             message: `URL resolution risk: ${desc}`,
             evidence: `${match[0].substring(0, 120)} — Recommendation: Use fs.readFileSync or equivalent for local files. Never pass bare filenames to network APIs.`,
+            recommendation: 'Use fs.readFileSync or equivalent for local files. Never pass bare filenames to network APIs.',
           });
         }
       }
@@ -153,13 +165,17 @@ export class ConventionSquattingScanner implements Scanner {
         const resolves = await domainResolves(domain, this.resolver);
         if (resolves) {
           findings.push({
+            id: 'SQUAT-003',
             scanner: this.name,
             rule: 'SQUAT-003',
-            severity: 'CRITICAL',
+            severity: 'critical',
+            title: 'Known Squatted Domain Detected',
+            description: `Known convention filename "${domain}" resolves as a live domain`,
             file: '<dns-check>',
             line: 0,
             message: `Known convention filename "${domain}" resolves as a live domain`,
             evidence: `${domain} has DNS A records. An attacker (or opportunist) has registered this domain. Any agent resolving this filename via URL will fetch attacker-controlled content.`,
+            recommendation: 'Block or monitor this domain. Ensure agents never resolve convention filenames via network.',
           });
         }
       }
@@ -168,6 +184,7 @@ export class ConventionSquattingScanner implements Scanner {
     return {
       scanner: this.name,
       findings,
+      scannedFiles: files.length,
       filesScanned: files.length,
       duration: Date.now() - start,
     };

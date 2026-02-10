@@ -73,7 +73,7 @@ describe('ConventionSquattingScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
         expect(matches.length).toBe(2);
-        expect(matches.every((m) => m.message.includes('TLD collision'))).toBe(true);
+        expect(matches.every((m) => m.message?.includes('TLD collision'))).toBe(true);
       } finally {
         cleanup(dir);
       }
@@ -85,7 +85,7 @@ describe('ConventionSquattingScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
         expect(matches.length).toBe(1);
-        expect(matches[0].severity).toBe('MEDIUM');
+        expect(matches[0].severity).toBe('medium');
       } finally {
         cleanup(dir);
       }
@@ -97,7 +97,7 @@ describe('ConventionSquattingScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
         expect(matches.length).toBe(1);
-        expect(matches[0].severity).toBe('LOW');
+        expect(matches[0].severity).toBe('info');
       } finally {
         cleanup(dir);
       }
@@ -138,7 +138,7 @@ describe('ConventionSquattingScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-002');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('HIGH');
+        expect(matches[0].severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -198,10 +198,10 @@ describe('ConventionSquattingScanner', () => {
         const result = await dnsScanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-003');
         expect(matches.length).toBe(2);
-        expect(matches.every((m) => m.severity === 'CRITICAL')).toBe(true);
+        expect(matches.every((m) => m.severity === 'critical')).toBe(true);
         const domains = matches.map((m) => m.message);
-        expect(domains.some((d) => d.includes('readme.md'))).toBe(true);
-        expect(domains.some((d) => d.includes('heartbeat.md'))).toBe(true);
+        expect(domains.some((d) => d?.includes('readme.md'))).toBe(true);
+        expect(domains.some((d) => d?.includes('heartbeat.md'))).toBe(true);
       } finally {
         cleanup(dir);
       }
@@ -239,12 +239,12 @@ describe('ConventionSquattingScanner', () => {
       const dir = createTempDir({ 'HEARTBEAT.md': '- check email' });
       try {
         const result = await scanner.scan(dir);
-        const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001' && f.file.includes('HEARTBEAT'));
+        const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001' && f.file?.includes('HEARTBEAT'));
         const squat004 = result.findings.filter((f) => f.rule === 'SQUAT-004');
         expect(squat001.length).toBe(1);
-        expect(squat001[0].severity).toBe('HIGH');
+        expect(squat001[0].severity).toBe('high');
         expect(squat004.length).toBe(1);
-        expect(squat004[0].severity).toBe('HIGH');
+        expect(squat004[0].severity).toBe('high');
         expect(squat004[0].message).toContain('persistent injection');
       } finally {
         cleanup(dir);

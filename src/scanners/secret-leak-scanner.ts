@@ -88,8 +88,8 @@ export const secretLeakScanner: ScannerModule = {
         if (isTestFileForScoring(file)) {
           for (const f of fileFindings) {
             f.isTestFile = true;
-            if (!f.title.startsWith('[TEST]')) {
-              f.title = `[TEST] ${f.title}`;
+            if (!f.title!.startsWith('[TEST]')) {
+              f.title! = `[TEST] ${f.title!}`;
             }
           }
         }
@@ -384,7 +384,7 @@ function isSecretOrTokenFinding(finding: Finding): boolean {
     /secret/i,
     /SL-/,  // Secret Leak pattern IDs
   ];
-  return secretFindingPatterns.some(p => p.test(finding.id) || p.test(finding.title));
+  return secretFindingPatterns.some(p => p.test(finding.id ?? '') || p.test(finding.title ?? ''));
 }
 
 function maskValue(text: string, maxLen: number): string {

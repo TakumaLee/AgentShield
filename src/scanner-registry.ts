@@ -27,10 +27,10 @@ export class ScannerRegistry {
       timestamp,
       results,
       totalFindings: allFindings.length,
-      criticalCount: allFindings.filter((f) => f.severity === 'CRITICAL').length,
-      highCount: allFindings.filter((f) => f.severity === 'HIGH').length,
-      mediumCount: allFindings.filter((f) => f.severity === 'MEDIUM').length,
-      lowCount: allFindings.filter((f) => f.severity === 'LOW').length,
+      criticalCount: allFindings.filter((f) => f.severity === 'critical').length,
+      highCount: allFindings.filter((f) => f.severity === 'high').length,
+      mediumCount: allFindings.filter((f) => f.severity === 'medium').length,
+      lowCount: allFindings.filter((f) => f.severity === 'info').length,
     };
   }
 }

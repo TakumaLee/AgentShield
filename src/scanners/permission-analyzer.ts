@@ -88,7 +88,7 @@ export const permissionAnalyzer: ScannerModule = {
                 for (const f of permFindings) {
                   if (f.severity !== 'info') {
                     f.severity = 'info';
-                    f.description += ' [cache/data file — severity reduced]';
+                    f.description! += ' [cache/data file — severity reduced]';
                   }
                 }
               }
@@ -137,7 +137,7 @@ export const permissionAnalyzer: ScannerModule = {
           for (const f of findings) {
             if (f.file === file && f.severity !== 'info') {
               f.severity = 'info';
-              f.description += ` ${label}`;
+              f.description! += ` ${label}`;
             }
           }
         }
@@ -153,7 +153,7 @@ export const permissionAnalyzer: ScannerModule = {
         for (const f of findings) {
           if (f.title === 'No authentication configured' && f.severity !== 'info') {
             f.severity = 'info';
-            f.description += ' [Authentication modules detected but may not cover all entry points.]';
+            f.description! += ' [Authentication modules detected but may not cover all entry points.]';
           }
         }
       }
@@ -162,20 +162,20 @@ export const permissionAnalyzer: ScannerModule = {
       for (const f of findings) {
         if (f.id?.startsWith('PERM-TOOL-UNRESTRICTED') && f.severity === 'critical') {
           f.severity = 'info';
-          f.description += ' [Framework context: tool permission boundaries are typically configured by end users, not hardcoded in framework source.]';
+          f.description! += ' [Framework context: tool permission boundaries are typically configured by end users, not hardcoded in framework source.]';
         } else if (f.id?.startsWith('PERM-TOOL-PARTIAL') && f.severity === 'high') {
           f.severity = 'info';
-          f.description += ' [Framework context: partial boundaries detected in framework code; full configuration is delegated to end users.]';
+          f.description! += ' [Framework context: partial boundaries detected in framework code; full configuration is delegated to end users.]';
         }
       }
     }
 
     // Downgrade markdown file findings (technical discussions, not attacks)
     for (const f of findings) {
-      if (f.file && isMarkdownFile(f.file) && !f.description.includes('[markdown')) {
+      if (f.file && isMarkdownFile(f.file) && !f.description!.includes('[markdown')) {
         if (f.severity === 'critical') f.severity = 'medium';
         else if (f.severity === 'high') f.severity = 'info';
-        f.description += ' [markdown file — technical discussion, severity reduced]';
+        f.description! += ' [markdown file — technical discussion, severity reduced]';
       }
     }
 
@@ -184,8 +184,8 @@ export const permissionAnalyzer: ScannerModule = {
       if (f.file && isTestOrDocFile(f.file)) {
         if (f.severity === 'critical') f.severity = 'medium';
         else if (f.severity === 'high') f.severity = 'info';
-        if (!f.description.includes('[test/doc file')) {
-          f.description += ' [test/doc file — severity reduced]';
+        if (!f.description!.includes('[test/doc file')) {
+          f.description! += ' [test/doc file — severity reduced]';
         }
       }
     }

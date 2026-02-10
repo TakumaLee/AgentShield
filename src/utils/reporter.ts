@@ -28,7 +28,7 @@ export function printReport(report: ScanReport): void {
   console.log(chalk.gray(`  Version:   ${report.version}`));
   console.log('');
 
-  if (report.summary.totalFindings === 0) {
+  if (report.summary!.totalFindings === 0) {
     console.log(chalk.green.bold('  ✅ No vulnerabilities found! Your agent looks secure.'));
     console.log('');
   } else {
@@ -37,7 +37,7 @@ export function printReport(report: ScanReport): void {
       if (result.findings.length === 0) continue;
 
       console.log(chalk.bold.white(`  ── ${result.scanner} ──`));
-      console.log(chalk.gray(`     Scanned ${result.scannedFiles} files in ${result.duration}ms`));
+      console.log(chalk.gray(`     Scanned ${result.scannedFiles ?? result.filesScanned ?? 0} files in ${result.duration}ms`));
       console.log('');
 
       for (const finding of result.findings) {
@@ -56,18 +56,18 @@ function printFinding(finding: Finding): void {
   const colorFn = SEVERITY_COLORS[finding.severity];
   const sevLabel = colorFn(finding.severity.toUpperCase().padEnd(8));
 
-  console.log(`  ${icon} ${sevLabel} ${chalk.white.bold(finding.title)}`);
-  console.log(chalk.gray(`     ${finding.description}`));
+  console.log(`  ${icon} ${sevLabel} ${chalk.white.bold(finding.title ?? finding.rule ?? '')}`);
+  console.log(chalk.gray(`     ${finding.description ?? finding.message ?? ''}`));
   if (finding.file) {
     const loc = finding.line ? `${finding.file}:${finding.line}` : finding.file;
     console.log(chalk.gray(`     📁 ${loc}`));
   }
-  console.log(chalk.green(`     💡 ${finding.recommendation}`));
+  console.log(chalk.green(`     💡 ${finding.recommendation ?? finding.evidence ?? ''}`));
   console.log('');
 }
 
 function printSummaryBar(report: ScanReport): void {
-  const s = report.summary;
+  const s = report.summary!;
   console.log(chalk.bold.cyan('  ─────────────────────────────────────────────────────'));
   console.log('');
 

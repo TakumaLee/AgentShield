@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   const registry = createDefaultRegistry(iocPath);
   const report = await registry.runAll(path.resolve(targetDir));
   printReport(report);
-  process.exit(report.criticalCount > 0 ? 2 : report.highCount > 0 ? 1 : 0);
+  process.exit((report.criticalCount ?? 0) > 0 ? 2 : (report.highCount ?? 0) > 0 ? 1 : 0);
 }
 
 main().catch((err) => {

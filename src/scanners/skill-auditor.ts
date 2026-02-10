@@ -260,7 +260,7 @@ export function applyFrameworkDowngrades(findings: Finding[], filePath: string):
 
   for (const f of findings) {
     // Path traversal (SA-006): downgrade in framework infra, keep in user-input files
-    if (f.id.startsWith('SA-006-') && inFrameworkDir && !inUserInputFile) {
+    if (f.id!.startsWith('SA-006-') && inFrameworkDir && !inUserInputFile) {
       if (f.severity === 'high') {
         f.severity = 'medium';
         f.description += ' [Framework infrastructure file — path traversal less likely to be exploitable here.]';
@@ -268,7 +268,7 @@ export function applyFrameworkDowngrades(findings: Finding[], filePath: string):
     }
 
     // Shell execution capability (SA-003d): downgrade in core, keep in skills/plugins
-    if (f.id.startsWith('SA-003d-') && !inSkillPlugin) {
+    if (f.id!.startsWith('SA-003d-') && !inSkillPlugin) {
       if (f.severity === 'medium') {
         f.severity = 'info';
         f.description += ' [Framework-level shell capability — expected for AI Agent runtimes. Verify input sanitization before command execution.]';
@@ -278,7 +278,7 @@ export function applyFrameworkDowngrades(findings: Finding[], filePath: string):
     // .env / credential file reading (SA-002): downgrade if not combined with network exfil
     // SA-001/SA-001b/SA-001c are env exfiltration (keep critical)
     // SA-002 "Reading sensitive file" — downgrade standalone reads (not SA-002b which is read+network)
-    if (f.id.startsWith('SA-002-') && f.title === 'Reading sensitive file') {
+    if (f.id!.startsWith('SA-002-') && f.title === 'Reading sensitive file') {
       f.severity = 'info';
       f.description += ' [Standard environment variable loading (12-factor app pattern). Verify .env is in .gitignore.]';
     }
@@ -314,7 +314,7 @@ export const skillAuditor: ScannerModule = {
         // App context (default): SA-003d shell imports are normal for agent tools
         if (context === 'app') {
           for (const f of fileFindings) {
-            if (f.id.startsWith('SA-003d-') && f.severity === 'medium') {
+            if (f.id!.startsWith('SA-003d-') && f.severity === 'medium') {
               f.severity = 'info';
               f.description += ' [App context: shell execution is a normal capability for AI agent tools.]';
             }
@@ -349,7 +349,7 @@ export const skillAuditor: ScannerModule = {
         // paths is normal behavior — they need to detect credential leaks
         if (isSecurityToolFile(file)) {
           for (const f of fileFindings) {
-            if (f.id.startsWith('SA-002-') && f.title === 'Reading sensitive file' && f.severity !== 'info') {
+            if (f.id!.startsWith('SA-002-') && f.title === 'Reading sensitive file' && f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool file — reading credential paths for detection is expected behavior]';
             }

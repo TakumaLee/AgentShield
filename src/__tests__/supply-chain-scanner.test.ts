@@ -37,7 +37,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-001');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('HIGH');
+        expect(matches[0].severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -89,7 +89,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-002');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('CRITICAL');
+        expect(matches[0].severity).toBe('critical');
       } finally {
         cleanup(dir);
       }
@@ -149,7 +149,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-003');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('CRITICAL');
+        expect(matches[0].severity).toBe('critical');
       } finally {
         cleanup(dir);
       }
@@ -206,7 +206,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-004');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('CRITICAL');
+        expect(matches[0].severity).toBe('critical');
       } finally {
         cleanup(dir);
       }
@@ -263,7 +263,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-005');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('HIGH');
+        expect(matches[0].severity).toBe('high');
       } finally {
         cleanup(dir);
       }
@@ -307,7 +307,7 @@ describe('SupplyChainScanner', () => {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SUPPLY-006');
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        expect(matches[0].severity).toBe('HIGH');
+        expect(matches[0].severity).toBe('high');
       } finally {
         cleanup(dir);
       }

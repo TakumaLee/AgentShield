@@ -144,7 +144,7 @@ function checkEnvironmentIsolation(ctx: CheckContext): HygieneFinding {
   if (found.length > 0) {
     return {
       checkName: 'Environment Isolation',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'FAIL',
       description: `Agent runs on primary workstation. Detected: ${found.join(', ')}`,
       recommendation: 'Run agent in an isolated VM, container, or dedicated machine without personal/work applications.',
@@ -153,7 +153,7 @@ function checkEnvironmentIsolation(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Environment Isolation',
-    severity: 'HIGH',
+    severity: 'high',
     status: 'PASS',
     description: 'No common work applications detected on this host.',
     recommendation: 'Continue running agent in an isolated environment.',
@@ -166,7 +166,7 @@ function checkFileAccessScope(ctx: CheckContext): HygieneFinding {
   if (!access) {
     return {
       checkName: 'File Access Scope',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'WARN',
       description: 'No file access configuration found. Access scope is unclear.',
       recommendation: 'Explicitly configure file access to a sandboxed directory.',
@@ -181,7 +181,7 @@ function checkFileAccessScope(ctx: CheckContext): HygieneFinding {
   if (dangerous.length > 0) {
     return {
       checkName: 'File Access Scope',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'FAIL',
       description: `Unrestricted file system access detected: ${dangerous.join(', ')}`,
       recommendation: 'Restrict file access to the agent workspace directory only.',
@@ -190,7 +190,7 @@ function checkFileAccessScope(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'File Access Scope',
-    severity: 'HIGH',
+    severity: 'high',
     status: 'PASS',
     description: 'File access is scoped to specific directories.',
     recommendation: 'Maintain restrictive file access policies.',
@@ -203,7 +203,7 @@ function checkShellAccess(ctx: CheckContext): HygieneFinding {
   if (!shell) {
     return {
       checkName: 'Shell/Exec Access',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'WARN',
       description: 'No shell access configuration found.',
       recommendation: 'Explicitly configure shell access with an allowlist of permitted commands.',
@@ -214,7 +214,7 @@ function checkShellAccess(ctx: CheckContext): HygieneFinding {
     if (shell === 'full' || shell === 'unrestricted') {
       return {
         checkName: 'Shell/Exec Access',
-        severity: 'HIGH',
+        severity: 'high',
         status: 'FAIL',
         description: 'Shell execution is fully open with no restrictions.',
         recommendation: 'Configure an allowlist of permitted commands.',
@@ -224,7 +224,7 @@ function checkShellAccess(ctx: CheckContext): HygieneFinding {
     if (shell.enabled !== false && (!shell.allowlist || shell.allowlist.length === 0)) {
       return {
         checkName: 'Shell/Exec Access',
-        severity: 'HIGH',
+        severity: 'high',
         status: 'FAIL',
         description: 'Shell execution is enabled without an allowlist.',
         recommendation: 'Define an allowlist of permitted shell commands.',
@@ -234,7 +234,7 @@ function checkShellAccess(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Shell/Exec Access',
-    severity: 'HIGH',
+    severity: 'high',
     status: 'PASS',
     description: 'Shell access is configured with restrictions.',
     recommendation: 'Regularly review the shell command allowlist.',
@@ -256,7 +256,7 @@ function checkCredentialExposure(ctx: CheckContext): HygieneFinding {
   if (exposures.length > 0) {
     return {
       checkName: 'Credential Exposure',
-      severity: 'CRITICAL',
+      severity: 'critical',
       status: 'FAIL',
       description: `Found ${exposures.length} potential credential(s): ${exposures.slice(0, 5).join('; ')}${exposures.length > 5 ? ` (+${exposures.length - 5} more)` : ''}`,
       recommendation: 'Remove all hardcoded credentials. Use a secrets manager or environment variables injected at runtime.',
@@ -265,7 +265,7 @@ function checkCredentialExposure(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Credential Exposure',
-    severity: 'CRITICAL',
+    severity: 'critical',
     status: 'PASS',
     description: 'No exposed credentials detected in scanned files.',
     recommendation: 'Continue using secure credential management.',
@@ -278,7 +278,7 @@ function checkBrowserIsolation(ctx: CheckContext): HygieneFinding {
   if (!profile) {
     return {
       checkName: 'Browser Profile Isolation',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: 'WARN',
       description: 'No browser profile configuration found.',
       recommendation: 'Configure agent to use a dedicated, isolated browser profile.',
@@ -289,7 +289,7 @@ function checkBrowserIsolation(ctx: CheckContext): HygieneFinding {
   if (lp === 'default' || lp === 'personal' || lp === 'main') {
     return {
       checkName: 'Browser Profile Isolation',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: 'FAIL',
       description: `Agent uses non-isolated browser profile: "${profile}". May have access to logged-in sessions.`,
       recommendation: 'Create a dedicated browser profile for the agent with no logged-in sessions.',
@@ -298,7 +298,7 @@ function checkBrowserIsolation(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Browser Profile Isolation',
-    severity: 'MEDIUM',
+    severity: 'medium',
     status: 'PASS',
     description: `Agent uses browser profile: "${profile}".`,
     recommendation: 'Ensure the browser profile has no persistent logged-in sessions.',
@@ -311,7 +311,7 @@ function checkCostControls(ctx: CheckContext): HygieneFinding {
   if (!limits) {
     return {
       checkName: 'Cost Controls',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: 'FAIL',
       description: 'No cost/spending limits configured.',
       recommendation: 'Set daily and monthly spending limits with a hard cap.',
@@ -321,7 +321,7 @@ function checkCostControls(ctx: CheckContext): HygieneFinding {
   if (!limits.hardLimit && limits.hardLimit !== 0) {
     return {
       checkName: 'Cost Controls',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: 'WARN',
       description: 'Soft limits exist but no hard spending limit is set.',
       recommendation: 'Add a hardLimit that auto-stops the agent when reached.',
@@ -330,7 +330,7 @@ function checkCostControls(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Cost Controls',
-    severity: 'MEDIUM',
+    severity: 'medium',
     status: 'PASS',
     description: `Hard spending limit set at ${limits.hardLimit}.`,
     recommendation: 'Review spending limits periodically.',
@@ -343,7 +343,7 @@ function checkTradingSafeguards(ctx: CheckContext): HygieneFinding {
   if (!trading || !trading.enabled) {
     return {
       checkName: 'Trading/Financial Safeguards',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'PASS',
       description: 'No trading capabilities detected or trading is disabled.',
       recommendation: 'If adding trading capabilities, enable all safeguards.',
@@ -359,7 +359,7 @@ function checkTradingSafeguards(ctx: CheckContext): HygieneFinding {
   if (issues.length > 0) {
     return {
       checkName: 'Trading/Financial Safeguards',
-      severity: 'HIGH',
+      severity: 'high',
       status: issues.length >= 3 ? 'FAIL' : 'WARN',
       description: `Trading is enabled with missing safeguards: ${issues.join(', ')}`,
       recommendation: 'Enable simulation mode by default, set trade/loss limits, and require manual confirmation for real trades.',
@@ -368,7 +368,7 @@ function checkTradingSafeguards(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Trading/Financial Safeguards',
-    severity: 'HIGH',
+    severity: 'high',
     status: 'PASS',
     description: 'Trading safeguards are properly configured.',
     recommendation: 'Regularly review trading limits and keep simulation mode as default.',
@@ -382,7 +382,7 @@ function checkConventionFileSquatting(_ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Convention File Squatting',
-    severity: 'MEDIUM',
+    severity: 'medium',
     status: 'WARN',
     description: `Convention files with .md extension could resolve as Moldova TLD URLs: ${squattable.join(', ')}. If the agent framework resolves local filenames as URLs, this is exploitable.`,
     recommendation: 'Ensure agent framework does not perform URL resolution on local convention filenames. Consider using non-TLD extensions.',
@@ -405,7 +405,7 @@ function checkPromptInjectionDefenses(ctx: CheckContext): HygieneFinding {
   if (missing.length === 3) {
     return {
       checkName: 'Prompt Injection Defenses',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'FAIL',
       description: 'No prompt injection defenses detected.',
       recommendation: 'Add identity lock rules, input sanitization, and output guards to the system prompt/config.',
@@ -415,7 +415,7 @@ function checkPromptInjectionDefenses(ctx: CheckContext): HygieneFinding {
   if (missing.length > 0) {
     return {
       checkName: 'Prompt Injection Defenses',
-      severity: 'HIGH',
+      severity: 'high',
       status: 'WARN',
       description: `Missing prompt injection defenses: ${missing.join(', ')}`,
       recommendation: `Add the following defenses: ${missing.join(', ')}.`,
@@ -424,7 +424,7 @@ function checkPromptInjectionDefenses(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Prompt Injection Defenses',
-    severity: 'HIGH',
+    severity: 'high',
     status: 'PASS',
     description: 'Prompt injection defenses are configured.',
     recommendation: 'Test defenses regularly with adversarial prompts.',
@@ -437,7 +437,7 @@ function checkMonitoringKillSwitch(ctx: CheckContext): HygieneFinding {
   if (!mon) {
     return {
       checkName: 'Monitoring & Kill Switch',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: 'FAIL',
       description: 'No monitoring or kill switch configuration found.',
       recommendation: 'Enable activity logging, anomaly detection, and an auto-shutdown kill switch.',
@@ -452,7 +452,7 @@ function checkMonitoringKillSwitch(ctx: CheckContext): HygieneFinding {
   if (missing.length > 0) {
     return {
       checkName: 'Monitoring & Kill Switch',
-      severity: 'MEDIUM',
+      severity: 'medium',
       status: missing.length >= 2 ? 'FAIL' : 'WARN',
       description: `Missing monitoring capabilities: ${missing.join(', ')}`,
       recommendation: `Enable: ${missing.join(', ')}.`,
@@ -461,7 +461,7 @@ function checkMonitoringKillSwitch(ctx: CheckContext): HygieneFinding {
 
   return {
     checkName: 'Monitoring & Kill Switch',
-    severity: 'MEDIUM',
+    severity: 'medium',
     status: 'PASS',
     description: 'Monitoring and kill switch are configured.',
     recommendation: 'Test kill switch regularly to ensure it works.',
@@ -471,10 +471,10 @@ function checkMonitoringKillSwitch(ctx: CheckContext): HygieneFinding {
 // --- Score calculation ---
 
 const SEVERITY_WEIGHTS: Record<Severity, number> = {
-  CRITICAL: 20,
-  HIGH: 15,
-  MEDIUM: 8,
-  LOW: 3,
+  critical: 20,
+  high: 15,
+  medium: 8,
+  info: 3,
 };
 
 const STATUS_MULTIPLIER: Record<CheckStatus, number> = {
@@ -589,18 +589,23 @@ export class HygieneAuditor implements Scanner {
     const findings: Finding[] = hygieneFindings
       .filter((hf) => hf.status !== 'PASS')
       .map((hf) => ({
+        id: `HYGIENE-${hf.checkName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`,
         scanner: this.name,
         rule: `HYGIENE-${hf.checkName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`,
         severity: hf.severity,
+        title: hf.checkName,
+        description: `[${hf.status}] ${hf.description}`,
         file: 'deployment-environment',
         line: 0,
         message: `[${hf.status}] ${hf.description}`,
         evidence: hf.recommendation,
+        recommendation: hf.recommendation,
       }));
 
     return {
       scanner: this.name,
       findings,
+      scannedFiles: files.length,
       filesScanned: files.length,
       duration: Date.now() - start,
     };
