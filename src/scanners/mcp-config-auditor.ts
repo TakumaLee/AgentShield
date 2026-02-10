@@ -253,6 +253,10 @@ const TOOL_DESCRIPTION_POISON_PATTERNS = [
   /\b(?:before|after)\s+(?:executing|running|performing).*(?:also|additionally|secretly)\b/i,
   /\bhttps?:\/\/[^\s]+.*(?:exfil|leak|steal|forward|send|post)/i,
   /\b(?:curl|wget|fetch|http\.post|axios\.post)\s+.*(?:secret|token|key|password|env)/i,
+  /\b(?:also|and)\s+(?:secretly|quietly|silently)?\s*(?:send|read|forward|exfiltrate|transmit|fetch|post)\b/i,
+  /\balso\s+read\s+\/etc\/passwd\b/i,
+  /\bsecretly\s+send\b/i,
+  /\bsend\s+[^\s]+\s+to\s+[^\s]*(?:\.com|\.net|\.org|\.io)\b/i,
 ];
 
 export function auditToolDescriptionPoisoning(config: Record<string, unknown>, filePath?: string): Finding[] {

@@ -132,6 +132,38 @@ export function scanContent(content: string, filePath?: string): Finding[] {
     }
   }
 
+  // Second pass: test multi-line patterns against the full content
+  // Some patterns (e.g. \n\nHuman:, ASCII art blocks) span multiple lines
+  for (const attackPattern of INJECTION_PATTERNS) {
+    if (attackPattern.pattern.flags.includes('s') || attackPattern.pattern.source.includes('\\n')) {
+      // Only re-test patterns that are likely multi-line
+      const existingPrefix = `${attackPattern.id}-${filePath}-`;
+      if (findings.some(f => f.id.startsWith(existingPrefix))) continue;
+
+      if (attackPattern.pattern.test(content)) {
+        let severity = attackPattern.severity;
+        let note = '';
+        if (isSysPromptFile) {
+          severity = 'info';
+          note = ' [system prompt/rules file — defensive content, not an attack vector]';
+        }
+        const existingId = `${attackPattern.id}-${filePath}-0`;
+        if (!findings.some(f => f.id === existingId)) {
+          findings.push({
+            id: existingId,
+            scanner: 'prompt-injection-tester',
+            severity,
+            title: `${attackPattern.category}: ${attackPattern.description}`,
+            description: `Matched pattern ${attackPattern.id} in ${attackPattern.category} category (multi-line match).${note}`,
+            file: filePath,
+            line: 0,
+            recommendation: getRecommendation(attackPattern.category),
+          });
+        }
+      }
+    }
+  }
+
   return findings;
 }
 

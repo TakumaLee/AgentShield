@@ -1412,7 +1412,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
   {
     id: 'PI-192',
     category: 'advanced',
-    pattern: /```\s*(?:text|ascii|art)?\s*\n(?:[^\w\n]*\w[^\w\n]*\n){3,}.*?(?:ignore|execute|override|send|always|secretly)/is,
+    pattern: /```\s*(?:text|ascii|art)?\s*\n(?:[^\n]*[█▓▒░■□●○╔╗╚╝═║][^\n]*\n){2,}.*?(?:ignore|execute|override|send|always|secretly)/is,
     severity: 'high',
     description: 'ASCII art block containing hidden instruction',
   },
@@ -1435,7 +1435,7 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
   {
     id: 'PI-195',
     category: 'encoding',
-    pattern: /[а-я].*?(?:ignore|override|execute|send)/i,
+    pattern: /[\u0400-\u04FF].*?(?:ignore|override|execute|send)/i,
     severity: 'high',
     description: 'Cyrillic character substitution in injection attempt (а instead of a)',
   },
