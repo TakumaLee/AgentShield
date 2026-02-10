@@ -105,6 +105,57 @@ Coverage mapping against the [OWASP MCP Top 10](https://github.com/OWASP/www-pro
 
 **Legend:** ✅ Covered — 🟡 Partial — 🔲 Planned
 
+## CI/CD Integration (GitHub Action)
+
+AgentShield provides a GitHub Action to automatically scan agent configurations in your CI/CD pipeline.
+
+### Quick Start
+
+```yaml
+# .github/workflows/agentshield.yml
+name: AgentShield Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: TakumaLee/AgentShield@main
+        with:
+          scan-path: '.'
+          fail-on-critical: 'true'
+          output-format: 'text'
+```
+
+### Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `scan-path` | Path to scan | `.` |
+| `fail-on-critical` | Fail workflow on critical findings | `true` |
+| `output-format` | Output format (`text` or `json`) | `text` |
+
+### Examples
+
+**Scan a specific directory with JSON output:**
+
+```yaml
+- uses: TakumaLee/AgentShield@main
+  with:
+    scan-path: './agents'
+    output-format: 'json'
+```
+
+**Warn on critical but don't fail:**
+
+```yaml
+- uses: TakumaLee/AgentShield@main
+  with:
+    fail-on-critical: 'false'
+```
+
 ## License
 
 MIT

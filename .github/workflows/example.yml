@@ -1,0 +1,22 @@
+name: AgentShield Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  agentshield:
+    runs-on: ubuntu-latest
+    name: Scan agent configs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run AgentShield
+        uses: TakumaLee/AgentShield@main
+        with:
+          scan-path: '.'
+          fail-on-critical: 'true'
+          output-format: 'text'

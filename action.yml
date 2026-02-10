@@ -1,0 +1,58 @@
+name: 'AgentShield Scan'
+description: 'Scan agent configurations for security risks using AgentShield'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  scan-path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  fail-on-critical:
+    description: 'Fail the workflow if critical findings are detected'
+    required: false
+    default: 'true'
+  output-format:
+    description: 'Output format: text or json'
+    required: false
+    default: 'text'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install AgentShield
+      shell: bash
+      run: npm install -g aiagentshield@0.7.0
+
+    - name: Run AgentShield Scan
+      id: scan
+      shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.scan-path }}
+        OUTPUT_FORMAT: ${{ inputs.output-format }}
+        FAIL_ON_CRITICAL: ${{ inputs.fail-on-critical }}
+      run: |
+        set +e
+        if [ "$OUTPUT_FORMAT" = "json" ]; then
+          OUTPUT=$(npx aiagentshield scan "$SCAN_PATH" --format json 2>&1)
+        else
+          OUTPUT=$(npx aiagentshield scan "$SCAN_PATH" 2>&1)
+        fi
+        EXIT_CODE=$?
+        echo "$OUTPUT"
+
+        # Check for critical findings
+        if [ "$FAIL_ON_CRITICAL" = "true" ]; then
+          if echo "$OUTPUT" | grep -qi "CRITICAL"; then
+            echo "::error::AgentShield detected CRITICAL findings. Failing workflow."
+            exit 1
+          fi
+        fi
+
+        exit $EXIT_CODE
