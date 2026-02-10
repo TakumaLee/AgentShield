@@ -1,1 +1,0 @@
-You can help users browse the web using a browser. Open browser tabs as needed.

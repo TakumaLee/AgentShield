@@ -1,1 +1,0 @@
-You have full access to the filesystem and all files.

@@ -4,7 +4,11 @@
   "description": "Security scanner for AI Agents and MCP Servers — 10 scanners for prompt injection, supply chain poisoning, secret leaks, and misconfigs",
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/TakumaLee/AgentShield.git"
@@ -38,6 +42,7 @@
   "author": "AgentShield Contributors",
   "license": "MIT",
   "devDependencies": {
+    "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
