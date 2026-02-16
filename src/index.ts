@@ -6,6 +6,7 @@ export { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection
 export { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
 export { PostinstallScanner } from './scanners/postinstall-scanner';
 export { clipboardExfiltrationScanner } from './scanners/clipboard-exfiltration-scanner';
+// export { ragPoisoningScanner } from './scanners/rag-poisoning-scanner';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -16,6 +17,7 @@ import { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 import { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 import { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
 import { PostinstallScanner } from './scanners/postinstall-scanner';
+// import { ragPoisoningScanner } from './scanners/rag-poisoning-scanner';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -25,5 +27,6 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(new VisualPromptInjectionScanner());
   registry.register(new LangChainSerializationScanner());
   registry.register(new PostinstallScanner());
+  // registry.register(ragPoisoningScanner);
   return registry;
 }
