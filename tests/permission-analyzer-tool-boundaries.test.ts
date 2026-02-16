@@ -152,7 +152,7 @@ describe('Tool Permission Boundaries (Gap 2)', () => {
 
     test('findings include recommendations', () => {
       const findings = analyzeToolPermissionBoundaries('tools: [exec]', 'config.yaml');
-      expect(findings[0].recommendation.length).toBeGreaterThan(0);
+      expect(findings[0].recommendation?.length).toBeGreaterThan(0);
     });
 
     test('critical finding has descriptive message about arbitrary arguments', () => {

@@ -5,32 +5,32 @@ describe('Permission Analyzer — Extended Coverage', () => {
   test('detects allowedPaths with root /', () => {
     const config = { allowedPaths: ['/'] };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('Root path'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('Root path'))).toBe(true);
   });
 
   test('detects allowedPaths with wildcard *', () => {
     const config = { allowedPaths: ['*'] };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('Wildcard'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('Wildcard'))).toBe(true);
   });
 
   test('detects scope: full', () => {
     const config = { scope: 'full' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('scope'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('scope'))).toBe(true);
   });
 
   test('detects access: unrestricted', () => {
     const config = { access: 'unrestricted' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('Unrestricted'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('Unrestricted'))).toBe(true);
   });
 
   // === Network access ===
   test('detects endpoint URL without restrictions', () => {
     const config = { endpoint: 'https://api.service.com/v1' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('domain restrictions'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('domain restrictions'))).toBe(true);
   });
 
   test('passes config with denyDomains', () => {
@@ -39,7 +39,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       denyDomains: ['evil.com'],
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('domain restrictions'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('domain restrictions'))).toBe(false);
   });
 
   test('passes config with allowedUrls', () => {
@@ -48,7 +48,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       allowedUrls: ['https://api.example.com'],
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('domain restrictions'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('domain restrictions'))).toBe(false);
   });
 
   test('passes config with blockedUrls', () => {
@@ -57,7 +57,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       blockedUrls: ['https://evil.com'],
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('domain restrictions'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('domain restrictions'))).toBe(false);
   });
 
   // === Missing auth ===
@@ -67,7 +67,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       token: 'some-token',
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('authentication'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('authentication'))).toBe(false);
   });
 
   test('does not flag missing auth when auth key present', () => {
@@ -76,7 +76,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       auth: { type: 'bearer' },
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('authentication'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('authentication'))).toBe(false);
   });
 
   // === Missing rate limits ===
@@ -86,7 +86,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       throttle: { maxConcurrent: 5 },
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('rate limiting'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('rate limiting'))).toBe(false);
   });
 
   test('does not flag when quota keyword present', () => {
@@ -95,7 +95,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       quota: { daily: 1000 },
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('rate limiting'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('rate limiting'))).toBe(false);
   });
 
   // === Missing logging ===
@@ -106,7 +106,7 @@ describe('Permission Analyzer — Extended Coverage', () => {
       audit: { enabled: true },
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('logging'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('logging'))).toBe(false);
   });
 
   test('does not flag when monitor keyword present', () => {
@@ -116,44 +116,44 @@ describe('Permission Analyzer — Extended Coverage', () => {
       monitor: { enabled: true },
     };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('logging'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('logging'))).toBe(false);
   });
 
   // === Filesystem scope ===
   test('detects filesystem command without path scoping', () => {
     const config = { command: 'filesystem-server', name: 'fs' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('filesystem'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('filesystem'))).toBe(true);
   });
 
   test('does not flag filesystem with allowedPaths', () => {
     const config = { command: 'filesystem-server', allowedPaths: ['/home/user'] };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('filesystem') && f.title.includes('without'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('filesystem') && f.title?.includes('without'))).toBe(false);
   });
 
   test('does not flag filesystem with rootDir', () => {
     const config = { command: 'filesystem-server', rootDir: '/home/user' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('filesystem') && f.title.includes('without'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('filesystem') && f.title?.includes('without'))).toBe(false);
   });
 
   test('does not flag filesystem with sandboxPath', () => {
     const config = { command: 'filesystem-server', sandboxPath: '/workspace' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('without path'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('without path'))).toBe(false);
   });
 
   test('detects read_file tool without path scoping', () => {
     const config = { name: 'read_file', description: 'reads files' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('file operations'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('file operations'))).toBe(true);
   });
 
   test('detects write_dir tool without path scoping', () => {
     const config = { name: 'write_dir', description: 'writes directories' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('directory operations'))).toBe(true);
+    expect(findings.some(f => f.title?.includes('directory operations'))).toBe(true);
   });
 
   // === Text permission analysis ===
@@ -178,18 +178,18 @@ describe('Permission Analyzer — Extended Coverage', () => {
   test('does not flag rate limits for configs without tools', () => {
     const config = { name: 'simple-app', version: '1.0' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('rate limiting'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('rate limiting'))).toBe(false);
   });
 
   test('does not flag auth for configs without server', () => {
     const config = { name: 'simple-lib' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('authentication'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('authentication'))).toBe(false);
   });
 
   test('does not flag logging for configs without tools/server', () => {
     const config = { name: 'simple' };
     const findings = analyzePermissions(config, 'test.json');
-    expect(findings.some(f => f.title.includes('logging'))).toBe(false);
+    expect(findings.some(f => f.title?.includes('logging'))).toBe(false);
   });
 });
