@@ -6,6 +6,9 @@ import {
   isTLDCollision,
   domainResolves,
   KNOWN_CONVENTION_FILES,
+  fetchPackageMetadata,
+  calculateContextScore,
+  PackageMetadata,
 } from '../scanners/convention-squatting-scanner';
 
 function createTempDir(files: Record<string, string>): string {
@@ -301,6 +304,188 @@ describe('ConventionSquattingScanner', () => {
       } finally {
         cleanup(dir);
       }
+    });
+  });
+
+  // --- Context Scoring ---
+
+  describe('Context Scoring', () => {
+    describe('fetchPackageMetadata', () => {
+      test('fetches package metadata successfully', async () => {
+        const mockFetcher = async (url: string) => {
+          if (url.includes('registry.npmjs.org')) {
+            return {
+              time: { created: '2020-01-01T00:00:00.000Z' },
+              maintainers: [{ name: 'dev1' }, { name: 'dev2' }],
+            };
+          }
+          if (url.includes('api.npmjs.org/downloads')) {
+            return { downloads: 50000 };
+          }
+          throw new Error('Unknown URL');
+        };
+
+        const metadata = await fetchPackageMetadata('test-package', mockFetcher);
+        expect(metadata).not.toBeNull();
+        expect(metadata?.name).toBe('test-package');
+        expect(metadata?.ageInDays).toBeGreaterThan(1000);
+        expect(metadata?.weeklyDownloads).toBe(50000);
+        expect(metadata?.maintainerCount).toBe(2);
+      });
+
+      test('returns null for non-existent package', async () => {
+        const mockFetcher = async () => {
+          throw new Error('404');
+        };
+
+        const metadata = await fetchPackageMetadata('non-existent-pkg', mockFetcher);
+        expect(metadata).toBeNull();
+      });
+    });
+
+    describe('calculateContextScore', () => {
+      test('keeps severity for new packages (< 30 days)', () => {
+        const metadata: PackageMetadata = {
+          name: 'new-pkg',
+          ageInDays: 15,
+          weeklyDownloads: 1000,
+          maintainerCount: 1,
+        };
+
+        const score = calculateContextScore('high', metadata);
+        expect(score.adjustedSeverity).toBe('high');
+        expect(score.reason).toContain('< 30 days');
+      });
+
+      test('keeps severity for low-traffic packages', () => {
+        const metadata: PackageMetadata = {
+          name: 'low-traffic',
+          ageInDays: 100,
+          weeklyDownloads: 500,
+          maintainerCount: 1,
+        };
+
+        const score = calculateContextScore('high', metadata);
+        expect(score.adjustedSeverity).toBe('high');
+        expect(score.reason).toContain('Low traffic');
+      });
+
+      test('downgrades by 2 levels for established high-traffic packages', () => {
+        const metadata: PackageMetadata = {
+          name: 'popular-pkg',
+          ageInDays: 730,
+          weeklyDownloads: 50000,
+          maintainerCount: 5,
+        };
+
+        const score = calculateContextScore('high', metadata);
+        expect(score.adjustedSeverity).toBe('info');
+        expect(score.reason).toContain('Established package');
+      });
+
+      test('downgrades by 1 level for moderate packages', () => {
+        const metadata: PackageMetadata = {
+          name: 'moderate-pkg',
+          ageInDays: 400,
+          weeklyDownloads: 5000,
+          maintainerCount: 1,
+        };
+
+        const score = calculateContextScore('high', metadata);
+        expect(score.adjustedSeverity).toBe('medium');
+        expect(score.reason).toContain('Moderate package');
+      });
+
+      test('handles null metadata', () => {
+        const score = calculateContextScore('high', null);
+        expect(score.adjustedSeverity).toBe('high');
+        expect(score.reason).toContain('No package metadata');
+      });
+    });
+
+    describe('Scanner with context scoring', () => {
+      test('applies context scoring to reduce severity', async () => {
+        const mockFetcher = async (url: string) => {
+          if (url.includes('registry.npmjs.org/readme')) {
+            return {
+              time: { created: '2020-01-01T00:00:00.000Z' },
+              maintainers: [{ name: 'dev1' }, { name: 'dev2' }, { name: 'dev3' }],
+            };
+          }
+          if (url.includes('api.npmjs.org/downloads')) {
+            return { downloads: 100000 };
+          }
+          throw new Error('Unknown URL');
+        };
+
+        const contextScanner = new ConventionSquattingScanner({ 
+          enableContextScoring: true,
+          fetcher: mockFetcher,
+        });
+
+        const dir = createTempDir({ 'README.md': '# Test' });
+        try {
+          const result = await contextScanner.scan(dir);
+          const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001');
+          expect(squat001.length).toBe(1);
+          // Should be downgraded from medium to info
+          expect(squat001[0].severity).toBe('info');
+          expect(squat001[0].description).toContain('Context:');
+        } finally {
+          cleanup(dir);
+        }
+      });
+
+      test('can disable context scoring', async () => {
+        const noContextScanner = new ConventionSquattingScanner({ 
+          enableContextScoring: false,
+        });
+
+        const dir = createTempDir({ 'README.md': '# Test' });
+        try {
+          const result = await noContextScanner.scan(dir);
+          const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001');
+          expect(squat001.length).toBe(1);
+          // Should keep original severity (medium for known files)
+          expect(squat001[0].severity).toBe('medium');
+          expect(squat001[0].description).not.toContain('Context:');
+        } finally {
+          cleanup(dir);
+        }
+      });
+
+      test('keeps high severity for suspicious new packages', async () => {
+        const mockFetcher = async (url: string) => {
+          if (url.includes('registry.npmjs.org/heartbeat')) {
+            return {
+              time: { created: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+              maintainers: [{ name: 'suspicious' }],
+            };
+          }
+          if (url.includes('api.npmjs.org/downloads')) {
+            return { downloads: 100 };
+          }
+          throw new Error('Unknown URL');
+        };
+
+        const contextScanner = new ConventionSquattingScanner({ 
+          enableContextScoring: true,
+          fetcher: mockFetcher,
+        });
+
+        const dir = createTempDir({ 'HEARTBEAT.md': '# Check' });
+        try {
+          const result = await contextScanner.scan(dir);
+          const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001');
+          expect(squat001.length).toBe(1);
+          // Should keep high severity for new suspicious package
+          expect(squat001[0].severity).toBe('high');
+          // Check that context note is included in the description
+          expect(squat001[0].description).toMatch(/Package age < 30 days|TLD collision/);
+        } finally {
+          cleanup(dir);
+        }
+      });
     });
   });
 });

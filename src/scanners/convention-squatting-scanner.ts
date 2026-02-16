@@ -4,6 +4,21 @@ import * as dns from 'dns';
 import { Scanner, ScanResult, Finding, Severity } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
 
+// --- Types ---
+
+export interface PackageMetadata {
+  name: string;
+  ageInDays: number;
+  weeklyDownloads: number;
+  maintainerCount: number;
+}
+
+export interface ContextScore {
+  originalSeverity: Severity;
+  adjustedSeverity: Severity;
+  reason: string;
+}
+
 // --- Constants ---
 
 /** TLDs that collide with common file extensions. */
@@ -67,6 +82,124 @@ function defaultResolve(hostname: string): Promise<string[]> {
   return dns.promises.resolve4(hostname);
 }
 
+/**
+ * Fetch package metadata from npm registry.
+ * Returns null if package doesn't exist or API fails.
+ */
+export async function fetchPackageMetadata(
+  packageName: string,
+  fetcher: (url: string) => Promise<any> = defaultFetcher,
+): Promise<PackageMetadata | null> {
+  try {
+    const data = await fetcher(`https://registry.npmjs.org/${packageName}`);
+    
+    // Calculate package age
+    const createdTime = data.time?.created;
+    const ageInDays = createdTime 
+      ? Math.floor((Date.now() - new Date(createdTime).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    // Get weekly downloads from npm API
+    const downloadsData = await fetcher(
+      `https://api.npmjs.org/downloads/point/last-week/${packageName}`
+    );
+    const weeklyDownloads = downloadsData?.downloads ?? 0;
+
+    // Count maintainers
+    const maintainerCount = Array.isArray(data.maintainers) ? data.maintainers.length : 0;
+
+    return {
+      name: packageName,
+      ageInDays,
+      weeklyDownloads,
+      maintainerCount,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function defaultFetcher(url: string): Promise<any> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+/**
+ * Calculate context score and adjust severity based on package metadata.
+ * 
+ * Scoring rules:
+ * - Age < 30 days: keep severity
+ * - Age < 365 days && downloads < 1000/week: keep severity
+ * - Age >= 365 days && downloads >= 10000/week && maintainers >= 3: downgrade by 2 levels
+ * - Age >= 365 days && downloads >= 1000/week: downgrade by 1 level
+ */
+export function calculateContextScore(
+  originalSeverity: Severity,
+  metadata: PackageMetadata | null,
+): ContextScore {
+  if (!metadata) {
+    return {
+      originalSeverity,
+      adjustedSeverity: originalSeverity,
+      reason: 'No package metadata available',
+    };
+  }
+
+  const { ageInDays, weeklyDownloads, maintainerCount } = metadata;
+
+  // New/suspicious packages: keep original severity
+  if (ageInDays < 30) {
+    return {
+      originalSeverity,
+      adjustedSeverity: originalSeverity,
+      reason: `Package age < 30 days (${ageInDays} days) - potential squatting`,
+    };
+  }
+
+  // Low-traffic packages: keep original severity
+  if (ageInDays < 365 && weeklyDownloads < 1000) {
+    return {
+      originalSeverity,
+      adjustedSeverity: originalSeverity,
+      reason: `Low traffic (${weeklyDownloads}/week) - suspicious activity`,
+    };
+  }
+
+  // Established, high-traffic packages: downgrade by 2 levels
+  if (ageInDays >= 365 && weeklyDownloads >= 10000 && maintainerCount >= 3) {
+    const adjusted = downgradeSeverity(originalSeverity, 2);
+    return {
+      originalSeverity,
+      adjustedSeverity: adjusted,
+      reason: `Established package (${ageInDays} days, ${weeklyDownloads}/week, ${maintainerCount} maintainers) - likely legitimate`,
+    };
+  }
+
+  // Moderate packages: downgrade by 1 level
+  if (ageInDays >= 365 && weeklyDownloads >= 1000) {
+    const adjusted = downgradeSeverity(originalSeverity, 1);
+    return {
+      originalSeverity,
+      adjustedSeverity: adjusted,
+      reason: `Moderate package (${ageInDays} days, ${weeklyDownloads}/week) - likely legitimate`,
+    };
+  }
+
+  return {
+    originalSeverity,
+    adjustedSeverity: originalSeverity,
+    reason: 'No context adjustments applied',
+  };
+}
+
+function downgradeSeverity(severity: Severity, levels: number): Severity {
+  const severityOrder: Severity[] = ['critical', 'high', 'medium', 'info'];
+  const currentIndex = severityOrder.indexOf(severity);
+  const newIndex = Math.min(currentIndex + levels, severityOrder.length - 1);
+  return severityOrder[newIndex];
+}
+
 // --- Scanner ---
 
 export class ConventionSquattingScanner implements Scanner {
@@ -78,10 +211,21 @@ export class ConventionSquattingScanner implements Scanner {
   private resolver: (hostname: string) => Promise<string[]>;
   /** Whether to perform live DNS checks. */
   private dnsCheck: boolean;
+  /** Whether to enable context scoring. */
+  private enableContextScoring: boolean;
+  /** Injected fetcher for testing. */
+  private fetcher: (url: string) => Promise<any>;
 
-  constructor(opts?: { resolver?: (hostname: string) => Promise<string[]>; dnsCheck?: boolean }) {
+  constructor(opts?: { 
+    resolver?: (hostname: string) => Promise<string[]>; 
+    dnsCheck?: boolean;
+    enableContextScoring?: boolean;
+    fetcher?: (url: string) => Promise<any>;
+  }) {
     this.resolver = opts?.resolver ?? defaultResolve;
     this.dnsCheck = opts?.dnsCheck ?? false;
+    this.enableContextScoring = opts?.enableContextScoring ?? true;
+    this.fetcher = opts?.fetcher ?? defaultFetcher;
   }
 
   async scan(targetDir: string): Promise<ScanResult> {
@@ -97,10 +241,24 @@ export class ConventionSquattingScanner implements Scanner {
         const isKnown = KNOWN_CONVENTION_FILES.includes(domain);
         const isHeartbeat = HEARTBEAT_FILENAMES.has(domain);
 
-        const severity: Severity = isHeartbeat ? 'high' : isKnown ? 'medium' : 'info';
+        let severity: Severity = isHeartbeat ? 'high' : isKnown ? 'medium' : 'info';
         const rec = isHeartbeat
           ? 'CRITICAL: This file is read periodically — a squatted domain would enable persistent injection. Use absolute local paths and validate file source is local filesystem, not network.'
           : 'Filename resolves as a valid domain. Ensure agent reads via local fs path, not URL resolution. Add integrity checks (hash verification) for convention files.';
+
+        // Apply context scoring if enabled
+        let contextNote = '';
+        if (this.enableContextScoring) {
+          // Convert domain to potential npm package name (remove extension)
+          const packageName = domain.replace(/\.[^/.]+$/, '');
+          const metadata = await fetchPackageMetadata(packageName, this.fetcher);
+          const contextScore = calculateContextScore(severity, metadata);
+          
+          if (contextScore.adjustedSeverity !== severity) {
+            contextNote = ` [Context: ${contextScore.originalSeverity} → ${contextScore.adjustedSeverity}: ${contextScore.reason}]`;
+            severity = contextScore.adjustedSeverity;
+          }
+        }
 
         findings.push({
           id: 'SQUAT-001',
@@ -108,10 +266,10 @@ export class ConventionSquattingScanner implements Scanner {
           rule: 'SQUAT-001',
           severity,
           title: 'Convention Filename TLD Collision',
-          description: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})`,
+          description: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})${contextNote}`,
           file: file.relativePath,
           line: 0,
-          message: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})`,
+          message: `Convention filename "${basename}" is a registrable domain (TLD collision: ${path.extname(basename)})${contextNote}`,
           evidence: `${domain} — ${rec}`,
           recommendation: rec,
         });
