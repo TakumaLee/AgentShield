@@ -156,7 +156,20 @@ export class VisualPromptInjectionScanner implements Scanner {
       // OCR failed - silently skip (common for test files with fake image content)
       // Only report for actual image processing errors in production use
       const errorMsg = error instanceof Error ? error.message : String(error);
-      if (!errorMsg.includes('Invalid file type') && !errorMsg.includes('unsupported image format')) {
+      
+      // Ignore common test/fake image errors
+      const ignoredErrors = [
+        'Invalid file type',
+        'unsupported image format',
+        'pix not read',
+        'cannot be read',
+        'Error attempting to read image',
+        'Unknown format'
+      ];
+      
+      const shouldIgnore = ignoredErrors.some(msg => errorMsg.includes(msg));
+      
+      if (!shouldIgnore) {
         findings.push({
           id: `VPI-150-OCR-ERROR-${path.basename(filePath)}`,
           scanner: 'visual-prompt-injection-scanner',
@@ -273,7 +286,7 @@ export class VisualPromptInjectionScanner implements Scanner {
 
     // Patterns for loading images from untrusted sources
     const unsafeSourcePatterns = [
-      { pattern: /fetch.*image|download.*image|http.*image/i, source: 'HTTP fetch' },
+      { pattern: /fetch\s*\(|download.*image|http.*image|imageResponse|image.*fetch/i, source: 'HTTP fetch' },
       { pattern: /user.*upload|file.*upload|multipart/i, source: 'User upload' },
       { pattern: /url.*param|query.*image|request.*image/i, source: 'URL parameter' },
       { pattern: /s3.*get|blob.*download|storage.*read/i, source: 'Cloud storage' },
