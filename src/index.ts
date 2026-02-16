@@ -5,6 +5,7 @@ export { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 export { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 export { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
 export { PostinstallScanner } from './scanners/postinstall-scanner';
+export { clipboardExfiltrationScanner } from './scanners/clipboard-exfiltration-scanner';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
