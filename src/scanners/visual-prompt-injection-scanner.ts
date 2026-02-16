@@ -1,22 +1,43 @@
 import { Scanner, ScanResult, Finding, Severity } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
+import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Dynamic import for tesseract.js (ESM module)
+let Tesseract: any = null;
+
+async function getTesseract() {
+  if (!Tesseract) {
+    Tesseract = await import('tesseract.js');
+  }
+  return Tesseract;
+}
 
 export class VisualPromptInjectionScanner implements Scanner {
   name = 'Visual Prompt Injection Scanner';
-  description = 'Detects suspicious image processing + LLM vision API combinations that may be vulnerable to visual prompt injection attacks';
+  description = 'Detects suspicious image processing + LLM vision API combinations and scans image files for embedded prompt injection text';
 
   async scan(targetPath: string): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     let scannedFiles = 0;
 
-    // Walk all code files
-    for await (const file of walkFiles(targetPath)) {
-      if (!this.isCodeFile(file.path)) continue;
-      
+    // Scan code files
+    for (const file of walkFiles(targetPath)) {
+      if (this.isCodeFile(file.path)) {
+        scannedFiles++;
+        const codeFindings = this.scanFile(file);
+        findings.push(...codeFindings);
+      }
+    }
+
+    // Scan image files (walk separately since walkFiles doesn't include image extensions)
+    const imageFiles = this.findImageFiles(targetPath);
+    for (const imagePath of imageFiles) {
       scannedFiles++;
-      const fileFindings = this.scanFile(file);
-      findings.push(...fileFindings);
+      const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
+      findings.push(...imageFindings);
     }
 
     return {
@@ -27,8 +48,149 @@ export class VisualPromptInjectionScanner implements Scanner {
     };
   }
 
+  /**
+   * Find all image files in directory
+   */
+  private findImageFiles(dir: string): string[] {
+    const imageFiles: string[] = [];
+
+    function walk(currentDir: string): void {
+      if (!fs.existsSync(currentDir)) return;
+      try {
+        const items = fs.readdirSync(currentDir, { withFileTypes: true });
+        for (const item of items) {
+          const fullPath = path.join(currentDir, item.name);
+          if (item.isDirectory()) {
+            if (item.name === 'node_modules' || item.name === '.git' || item.name === 'dist' || item.name === 'coverage') continue;
+            walk(fullPath);
+          } else if (item.isFile()) {
+            const ext = path.extname(item.name).toLowerCase();
+            if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(ext)) {
+              imageFiles.push(fullPath);
+            }
+          }
+        }
+      } catch {
+        // skip unreadable directories
+      }
+    }
+
+    walk(dir);
+    return imageFiles;
+  }
+
   private isCodeFile(filePath: string): boolean {
     return /\.(ts|js|tsx|jsx|py|go|rs|java)$/.test(filePath);
+  }
+
+  private isImageFile(filePath: string): boolean {
+    return /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(filePath);
+  }
+
+  /**
+   * PI-150: Scan image files for embedded prompt injection text using OCR
+   */
+  private async scanImageFile(file: FileEntry): Promise<Finding[]> {
+    const findings: Finding[] = [];
+    const filePath = file.path;
+
+    try {
+      // Check if file exists and is readable
+      if (!fs.existsSync(filePath)) {
+        return findings;
+      }
+
+      const stat = fs.statSync(filePath);
+      if (stat.size > 10 * 1024 * 1024) {
+        // Skip large images (> 10MB) to avoid timeout
+        return findings;
+      }
+
+      // Perform OCR on image
+      const tesseract = await getTesseract();
+      const worker = await tesseract.createWorker('eng', undefined, {
+        logger: () => {}, // Disable logging to reduce noise
+      });
+      
+      const { data: { text } } = await worker.recognize(filePath);
+      await worker.terminate();
+
+      if (!text || text.trim().length === 0) {
+        // No text detected in image
+        return findings;
+      }
+
+      // Check for injection patterns in extracted text
+      const detectedPatterns = this.detectInjectionPatterns(text);
+
+      if (detectedPatterns.length > 0) {
+        const severityMap: { [key: string]: number } = {
+          critical: 3,
+          high: 2,
+          medium: 1,
+          info: 0,
+        };
+
+        // Sort by severity (highest first)
+        detectedPatterns.sort((a, b) => severityMap[b.severity] - severityMap[a.severity]);
+
+        // Report the top 3 most severe patterns found
+        const topPatterns = detectedPatterns.slice(0, 3);
+
+        for (const pattern of topPatterns) {
+          findings.push({
+            id: `VPI-150-${pattern.id}-${path.basename(filePath)}`,
+            scanner: 'visual-prompt-injection-scanner',
+            severity: pattern.severity,
+            title: `Visual Prompt Injection Detected: ${pattern.category}`,
+            description: `Image contains suspicious text that matches prompt injection pattern "${pattern.description}". This could be a visual prompt injection attack where malicious instructions are embedded in images. Extracted text snippet: "${text.substring(0, 150)}..."`,
+            file: filePath,
+            evidence: `Pattern: ${pattern.id} (${pattern.category})\nMatched text: ${text.substring(0, 300)}`,
+            confidence: 'likely',
+            recommendation: 'Review image content manually. If this image is processed by vision models, implement: 1) OCR-based text extraction and sanitization, 2) Pattern-based prompt injection detection before sending to vision API, 3) Content moderation, 4) Image provenance verification',
+          });
+        }
+      }
+
+    } catch (error) {
+      // OCR failed - silently skip (common for test files with fake image content)
+      // Only report for actual image processing errors in production use
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (!errorMsg.includes('Invalid file type') && !errorMsg.includes('unsupported image format')) {
+        findings.push({
+          id: `VPI-150-OCR-ERROR-${path.basename(filePath)}`,
+          scanner: 'visual-prompt-injection-scanner',
+          severity: 'info',
+          title: 'Image OCR Processing Failed',
+          description: `Failed to perform OCR on image file: ${errorMsg}`,
+          file: filePath,
+          confidence: 'possible',
+          recommendation: 'Ensure image format is supported and file is not corrupted. Supported formats: JPG, PNG, WebP',
+        });
+      }
+    }
+
+    return findings;
+  }
+
+  /**
+   * Detect injection patterns in text extracted from images
+   */
+  private detectInjectionPatterns(text: string): Array<{ id: string; severity: Severity; category: string; description: string }> {
+    const detected: Array<{ id: string; severity: Severity; category: string; description: string }> = [];
+
+    for (const pattern of INJECTION_PATTERNS) {
+      if (pattern.pattern.test(text)) {
+        detected.push({
+          id: pattern.id,
+          severity: pattern.severity,
+          category: pattern.category,
+          description: pattern.description,
+        });
+      }
+    }
+
+    return detected;
   }
 
   private scanFile(file: FileEntry): Finding[] {
@@ -55,13 +217,19 @@ export class VisualPromptInjectionScanner implements Scanner {
     // Vision API patterns
     const visionAPIs = [
       { pattern: /openai.*vision|gpt-4.*vision/i, api: 'OpenAI GPT-4 Vision' },
-      { pattern: /anthropic.*vision|claude.*vision/i, api: 'Anthropic Claude Vision' },
+      { pattern: /anthropic.*vision|claude.*vision|anthropic.*messages.*create.*image|claude.*\d+.*opus|claude.*\d+.*sonnet/i, api: 'Anthropic Claude Vision' },
       { pattern: /gemini.*vision|google.*vision/i, api: 'Google Gemini Vision' },
       { pattern: /llava|blip|clip/i, api: 'Open Source Vision Model' },
       { pattern: /vision.*api|image.*analyze|ocr.*api/i, api: 'Generic Vision API' },
     ];
 
     // Validation patterns (good practices)
+    // Exclude lines that start with // or are inside /* */ comments
+    const codeWithoutComments = content.split('\n')
+      .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('*'))
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    
     const validationPatterns = [
       /sanitize.*image|validate.*image|check.*image/i,
       /content.*moderation|safety.*filter/i,
@@ -69,7 +237,7 @@ export class VisualPromptInjectionScanner implements Scanner {
       /whitelist|allowlist|trusted.*source/i,
     ];
 
-    const hasValidation = validationPatterns.some(p => p.test(content));
+    const hasValidation = validationPatterns.some(p => p.test(codeWithoutComments));
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -149,7 +317,7 @@ export class VisualPromptInjectionScanner implements Scanner {
 
     // Check if vision API exists but no moderation
     const hasVisionAPI = /vision|gpt-4.*vision|claude.*vision|analyze.*image/i.test(content);
-    const hasModerationAPI = /moderation|content.*safety|perspective.*api|rekognition/i.test(content);
+    const hasModerationAPI = /\.moderations?\.create|moderations?\.create|perspective.*api\.analyze|rekognition\.detect/i.test(content);
     const hasTextExtraction = /ocr|tesseract|text.*from.*image|extract.*text/i.test(content);
 
     if (hasVisionAPI && !hasModerationAPI) {
