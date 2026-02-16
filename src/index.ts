@@ -4,6 +4,7 @@ export { HygieneAuditor } from './scanners/hygiene-auditor';
 export { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 export { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 export { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
+export { PostinstallScanner } from './scanners/postinstall-scanner';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -13,6 +14,7 @@ import { HygieneAuditor } from './scanners/hygiene-auditor';
 import { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 import { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 import { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
+import { PostinstallScanner } from './scanners/postinstall-scanner';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -21,5 +23,6 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(new DxtSecurityScanner());
   registry.register(new VisualPromptInjectionScanner());
   registry.register(new LangChainSerializationScanner());
+  registry.register(new PostinstallScanner());
   return registry;
 }
