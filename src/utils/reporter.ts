@@ -17,37 +17,70 @@ const SEVERITY_COLORS: Record<Severity, (text: string) => string> = {
   info: chalk.blue,
 };
 
+const DIVIDER = chalk.cyan('  ' + '━'.repeat(54));
+
+/**
+ * Normalize a finding to ensure title/description/recommendation are populated,
+ * even if the scanner used the legacy rule/message/evidence fields.
+ */
+function normalizeFinding(f: Finding): Finding {
+  return {
+    ...f,
+    title: f.title || f.rule || f.message || 'Unknown',
+    description: f.description || f.message || f.evidence || '',
+    recommendation: f.recommendation || f.evidence || 'Review this finding.',
+  };
+}
+
+/**
+ * Render an ASCII progress bar colored by score.
+ */
+function progressBar(score: number, width = 10): string {
+  const filled = Math.round((score / 100) * width);
+  const empty = width - filled;
+  const color =
+    score >= 80 ? chalk.green : score >= 60 ? chalk.yellow : chalk.red;
+  return color('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+}
+
 export function printReport(report: ScanReport): void {
+  const s = report.summary!;
+
   console.log('');
-  console.log(chalk.bold.cyan('╔══════════════════════════════════════════════════════════╗'));
-  console.log(chalk.bold.cyan('║') + chalk.bold.white('  🛡️  AgentShield Security Report                        ') + chalk.bold.cyan('║'));
-  console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════╝'));
-  console.log('');
+  console.log(DIVIDER);
+  console.log(
+    chalk.bold.cyan('  🛡️  AgentShield') +
+    chalk.gray(` v${report.version ?? ''}`) +
+    chalk.gray('  Security Report')
+  );
+  console.log(DIVIDER);
   console.log(chalk.gray(`  Target:    ${report.target}`));
   console.log(chalk.gray(`  Timestamp: ${report.timestamp}`));
-  console.log(chalk.gray(`  Version:   ${report.version}`));
+  console.log(chalk.gray(`  Scanners:  ${report.results.length} active`));
+  console.log(DIVIDER);
   console.log('');
 
-  if (report.summary!.totalFindings === 0) {
+  if (s.totalFindings === 0) {
     console.log(chalk.green.bold('  ✅ No vulnerabilities found! Your agent looks secure.'));
     console.log('');
   } else {
-    // Group findings by scanner
+    // Per-scanner findings
     for (const result of report.results) {
       if (result.findings.length === 0) continue;
 
-      console.log(chalk.bold.white(`  ── ${result.scanner} ──`));
-      console.log(chalk.gray(`     Scanned ${result.scannedFiles ?? result.filesScanned ?? 0} files in ${result.duration}ms`));
+      const filesCount = result.scannedFiles ?? result.filesScanned ?? 0;
+      console.log(
+        chalk.bold.white(`  ── ${result.scanner} ──`) +
+        chalk.gray(` (${filesCount} files, ${result.duration}ms)`)
+      );
       console.log('');
 
       for (const finding of result.findings) {
-        printFinding(finding);
+        printFinding(normalizeFinding(finding));
       }
-      console.log('');
     }
   }
 
-  // Summary bar
   printSummaryBar(report);
 }
 
@@ -56,26 +89,37 @@ function printFinding(finding: Finding): void {
   const colorFn = SEVERITY_COLORS[finding.severity];
   const sevLabel = colorFn(finding.severity.toUpperCase().padEnd(8));
 
-  console.log(`  ${icon} ${sevLabel} ${chalk.white.bold(finding.title ?? finding.rule ?? '')}`);
-  console.log(chalk.gray(`     ${finding.description ?? finding.message ?? ''}`));
+  console.log(`  ${icon} ${sevLabel} ${chalk.white.bold(finding.title ?? '')}`);
+  if (finding.description) {
+    console.log(chalk.gray(`     ${finding.description}`));
+  }
   if (finding.file) {
     const loc = finding.line ? `${finding.file}:${finding.line}` : finding.file;
     console.log(chalk.gray(`     📁 ${loc}`));
   }
-  console.log(chalk.green(`     💡 ${finding.recommendation ?? finding.evidence ?? ''}`));
+  if (finding.recommendation) {
+    console.log(chalk.green(`     💡 ${finding.recommendation}`));
+  }
   console.log('');
 }
 
 function printSummaryBar(report: ScanReport): void {
   const s = report.summary!;
-  console.log(chalk.bold.cyan('  ─────────────────────────────────────────────────────'));
+
+  console.log(DIVIDER);
   console.log('');
 
   // Grade display
-  const gradeColor = s.score >= 80 ? chalk.green.bold :
-    s.score >= 60 ? chalk.yellow.bold : chalk.red.bold;
+  const gradeColor =
+    s.score >= 80
+      ? chalk.green.bold
+      : s.score >= 60
+      ? chalk.yellow.bold
+      : chalk.red.bold;
 
-  console.log(`  ${chalk.bold('Security Grade:')} ${gradeColor(s.grade)} ${chalk.gray(`(${s.score}/100)`)}`);
+  console.log(
+    `  ${chalk.bold('Security Grade:')} ${gradeColor(s.grade)} ${chalk.gray(`(${s.score}/100)`)}`
+  );
   console.log('');
 
   // Finding counts
@@ -87,19 +131,13 @@ function printSummaryBar(report: ScanReport): void {
   ].filter(Boolean);
 
   if (counts.length > 0) {
-    console.log(`  ${chalk.bold('Findings:')} ${counts.join('  ')}`);
+    console.log(`  ${chalk.bold('Findings:')}  ${counts.join('  ')}`);
   } else {
-    console.log(`  ${chalk.bold('Findings:')} ${chalk.green('None')}`);
+    console.log(`  ${chalk.bold('Findings:')}  ${chalk.green('None')}`);
   }
-
-  console.log(`  ${chalk.bold('Files Scanned:')} ${s.scannedFiles}`);
-  if (s.ignoredFiles && s.ignoredFiles > 0) {
-    console.log(`  ${chalk.bold('Files Ignored:')} ${s.ignoredFiles} ${chalk.gray('(by .agentshieldignore)')}`);
-  }
-  console.log(`  ${chalk.bold('Duration:')} ${s.duration}ms`);
   console.log('');
 
-  // Dimension scores
+  // Dimension scores with progress bars
   if (s.dimensions) {
     console.log(`  ${chalk.bold('Dimensions:')}`);
     const dims = [
@@ -109,42 +147,66 @@ function printSummaryBar(report: ScanReport): void {
       { label: 'Env Safety', data: s.dimensions.environmentSafety },
     ];
     for (const dim of dims) {
-      const dimColor = dim.data.score >= 80 ? chalk.green :
-        dim.data.score >= 60 ? chalk.yellow : chalk.red;
-      console.log(`    ${dim.label.padEnd(15)} ${dimColor(dim.data.grade)} ${chalk.gray(`(${dim.data.score}/100)`)} ${chalk.gray(`${dim.data.findings} findings`)}`);
+      const dimColor =
+        dim.data.score >= 80
+          ? chalk.green
+          : dim.data.score >= 60
+          ? chalk.yellow
+          : chalk.red;
+      const bar = progressBar(dim.data.score);
+      const findingStr = dim.data.findings === 1 ? '1 finding' : `${dim.data.findings} findings`;
+      console.log(
+        `    ${dim.label.padEnd(15)} ${dimColor((dim.data.grade).padEnd(3))} ${chalk.gray(`(${dim.data.score}/100)`)}  ${bar}  ${chalk.gray(findingStr)}`
+      );
     }
     console.log('');
   }
 
   // Per-scanner breakdown
   if (s.scannerBreakdown) {
-    console.log(`  ${chalk.bold('Per-Scanner Breakdown:')}`);
-    for (const [scanner, counts] of Object.entries(s.scannerBreakdown)) {
-      const parts = [
-        counts.critical > 0 ? `${SEVERITY_ICONS.critical}${counts.critical}` : null,
-        counts.high > 0 ? `${SEVERITY_ICONS.high}${counts.high}` : null,
-        counts.medium > 0 ? `${SEVERITY_ICONS.medium}${counts.medium}` : null,
-        counts.info > 0 ? `${SEVERITY_ICONS.info}${counts.info}` : null,
-      ].filter(Boolean);
-      const total = counts.critical + counts.high + counts.medium + counts.info;
-      if (total > 0) {
-        console.log(`    ${scanner.padEnd(26)} ${parts.join(' ')}`);
+    const hasFindings = Object.values(s.scannerBreakdown).some(
+      (c) => c.critical + c.high + c.medium + c.info > 0
+    );
+    if (hasFindings) {
+      console.log(`  ${chalk.bold('Per-Scanner:')}`);
+      for (const [scanner, counts] of Object.entries(s.scannerBreakdown)) {
+        const parts = [
+          counts.critical > 0 ? `${SEVERITY_ICONS.critical}${counts.critical}` : null,
+          counts.high > 0 ? `${SEVERITY_ICONS.high}${counts.high}` : null,
+          counts.medium > 0 ? `${SEVERITY_ICONS.medium}${counts.medium}` : null,
+          counts.info > 0 ? `${SEVERITY_ICONS.info}${counts.info}` : null,
+        ].filter(Boolean);
+        const total = counts.critical + counts.high + counts.medium + counts.info;
+        if (total > 0) {
+          console.log(`    ${scanner.padEnd(30)} ${parts.join(' ')}`);
+        }
       }
+      console.log('');
     }
-    console.log('');
   }
 
-  // Recommendations
+  // Timing
+  const durationSec = (s.duration / 1000).toFixed(1);
+  console.log(
+    chalk.gray(
+      `  ⏱️  Completed in ${durationSec}s  |  ${s.scannedFiles} files scanned`
+    )
+  );
+  console.log('');
+
+  // Final verdict
   if (s.critical > 0) {
     console.log(chalk.red.bold('  ⚠️  CRITICAL issues found! Address these immediately.'));
-  }
-  if (s.high > 0) {
+  } else if (s.high > 0) {
     console.log(chalk.hex('#FF8C00')('  ⚠️  High severity issues require attention.'));
-  }
-  if (s.score >= 90) {
+  } else if (s.medium > 0) {
+    console.log(chalk.yellow('  ⚠️  Medium severity issues found. Review when possible.'));
+  } else if (s.score >= 90) {
     console.log(chalk.green('  ✨ Great security posture! Keep it up.'));
   }
 
+  console.log('');
+  console.log(DIVIDER);
   console.log('');
 }
 

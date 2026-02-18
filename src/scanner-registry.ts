@@ -1,4 +1,5 @@
 import { Scanner, ScanReport, ScanResult } from './types';
+import { calculateSummary } from './utils/scorer';
 
 export class ScannerRegistry {
   private scanners: Scanner[] = [];
@@ -20,17 +21,18 @@ export class ScannerRegistry {
       results.push(result);
     }
 
-    const allFindings = results.flatMap((r) => r.findings);
+    const summary = calculateSummary(results);
 
     return {
       target: targetDir,
       timestamp,
       results,
-      totalFindings: allFindings.length,
-      criticalCount: allFindings.filter((f) => f.severity === 'critical').length,
-      highCount: allFindings.filter((f) => f.severity === 'high').length,
-      mediumCount: allFindings.filter((f) => f.severity === 'medium').length,
-      lowCount: allFindings.filter((f) => f.severity === 'info').length,
+      summary,
+      totalFindings: summary.totalFindings,
+      criticalCount: summary.critical,
+      highCount: summary.high,
+      mediumCount: summary.medium,
+      lowCount: summary.info,
     };
   }
 }
