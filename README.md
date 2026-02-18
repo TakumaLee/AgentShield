@@ -4,47 +4,22 @@
 [![license](https://img.shields.io/npm/l/aiagentshield.svg)](https://github.com/TakumaLee/AgentShield/blob/main/LICENSE)
 [![tests](https://img.shields.io/github/actions/workflow/status/TakumaLee/AgentShield/ci.yml?label=tests)](https://github.com/TakumaLee/AgentShield/actions)
 
-**When your AI agent has tool access, prompt injection is RCE.** AgentShield scans agent skill packages for supply chain poisoning, naming attacks, and configuration risks — before they reach production.
+**When your AI agent has tool access, prompt injection is RCE.** AgentShield scans agent skill packages, MCP servers, and DXT extensions for supply chain poisoning, prompt injection, secret leaks, and misconfigs — before they reach production.
 
-## Scanners
+![AgentShield Demo](demo.gif)
 
-### 🔗 Supply Chain Scanner
+## 🚀 Quick Start
 
-Detects skill supply chain poisoning:
+```bash
+# Scan current directory
+npx aiagentshield .
 
-| Rule | Threat |
-|------|--------|
-| SUPPLY-001 | Base64 hidden commands |
-| SUPPLY-002 | Remote code execution patterns |
-| SUPPLY-003 | IOC blocklist matching |
-| SUPPLY-004 | Credential theft |
-| SUPPLY-005 | Data exfiltration |
-| SUPPLY-006 | Persistence mechanisms |
+# Scan a specific agent project
+npx aiagentshield ./path/to/agent
 
-### 🎭 Convention Squatting Scanner
-
-Detects naming impostor attacks — packages that mimic trusted skill names via typosquatting, prefix hijacking, or namespace confusion.
-
-### 🛡️ DXT Security Scanner
-
-Scans for insecure Claude Desktop Extension (DXT) configurations. DXT extensions run unsandboxed with full system privileges — a malicious calendar invite or email can trigger arbitrary code execution ([OWASP MCP01: Tool Poisoning](https://owasp.org/www-project-top-10-for-large-language-model-applications/) / MCP02: Trust Boundary violations).
-
-| Rule | Severity | Threat |
-|------|----------|--------|
-| DXT-001 | CRITICAL | Unsandboxed extension with external data source + local executor |
-| DXT-002 | HIGH | Unrestricted file system access |
-| DXT-003 | HIGH | Unrestricted network access |
-| DXT-004 | HIGH | Code execution permission enabled |
-| DXT-005 | HIGH | Extension running without sandboxing |
-| DXT-006 | HIGH | Unsigned/unverified extension |
-| DXT-007 | MEDIUM | Signed but unverified signature |
-| DXT-008 | MEDIUM | File system + network combo without sandbox |
-| DXT-009 | MEDIUM | External data source without sandbox |
-| DXT-010 | MEDIUM | Unrestricted executor |
-
-### 🧹 Hygiene Auditor
-
-Audits agent configuration hygiene — overly broad permissions, missing access controls, and risky defaults that expand an agent's attack surface.
+# JSON output for CI/CD
+npx aiagentshield ./path/to/agent --format json
+```
 
 ## Why AgentShield?
 
@@ -54,82 +29,83 @@ AI agents in 2026 operate with real tool access: file systems, APIs, databases, 
 - **Zero Trust for agent tooling.** Every skill should be verified before it gets tool access.
 - **Defense in depth works.** Research on 300K adversarial prompts shows multi-layer scanning drops attack success from 7% to 0.003%.
 
-AgentShield gives you that scanning layer — lightweight, pluggable, and CI/CD-ready.
+## 🔍 20 Security Scanners
 
-## Usage
+AgentShield v0.8.1 ships with **20 scanners** across 5 categories:
 
-```bash
-# Scan a directory
-npx aiagentshield ./path/to/agent
+### 🔗 Supply Chain & Code Integrity
 
-# With external IOC blocklist
-npx aiagentshield ./path/to/agent ./custom-ioc-blocklist.json
+| Scanner | What it catches |
+|---------|----------------|
+| **Supply Chain Scanner** | Base64 hidden commands, RCE patterns, IOC blocklist, credential theft, data exfiltration, persistence |
+| **Postinstall Scanner** | Malicious `postinstall` scripts in node_modules |
+| **LangChain Serialization Scanner** | Unsafe pickle/serialization deserialization in LangChain pipelines |
+| **Convention Squatting Scanner** | Typosquatting, prefix hijacking, namespace confusion on skill names |
+
+### 💉 Prompt Injection & Adversarial
+
+| Scanner | What it catches |
+|---------|----------------|
+| **Prompt Injection Tester** | Known injection patterns in prompts, configs, and user-facing text |
+| **Visual Prompt Injection Scanner** | Hidden instructions embedded in images (alt text, metadata, steganography) |
+| **RAG Poisoning Scanner** | Repetition attacks and content poisoning in RAG knowledge bases |
+| **Red Team Simulator** | Simulates common attack vectors (jailbreaks, role-play exploits, multi-turn attacks) |
+
+### 🔐 Secrets & Data Protection
+
+| Scanner | What it catches |
+|---------|----------------|
+| **Secret Leak Scanner** | API keys, tokens, passwords, private keys in code and configs |
+| **Clipboard Exfiltration Scanner** | Clipboard access patterns used for data theft |
+| **DNS/ICMP Tool Scanner** | Covert data exfiltration via DNS tunneling or ICMP channels |
+
+### 🛡️ Configuration & Permissions
+
+| Scanner | What it catches |
+|---------|----------------|
+| **DXT Security Scanner** | Insecure Claude Desktop Extensions — unsandboxed execution, unrestricted file/network access |
+| **MCP Config Auditor** | Dangerous MCP server configurations, overprivileged tools, missing auth |
+| **Agent Config Auditor** | Risky agent configurations, missing safety guardrails |
+| **Hygiene Auditor** | Overly broad permissions, missing access controls, risky defaults |
+| **Permission Analyzer** | Excessive permission grants, missing least-privilege enforcement |
+| **Environment Isolation Auditor** | Missing sandboxing, shared environments, container escape risks |
+
+### 🧪 Architecture & Defense
+
+| Scanner | What it catches |
+|---------|----------------|
+| **Skill Auditor** | Skill package structure issues, unsafe patterns, missing validation |
+| **Channel Surface Auditor** | Multi-channel attack surfaces, unprotected input channels |
+| **Defense Analyzer** | Missing defense layers, gaps in security architecture |
+
+## 📊 Security Grade
+
+AgentShield outputs a **Security Grade** (A+ to F) based on scan results:
+
+```
+╔══════════════════════════════════════════╗
+║         AgentShield Security Report      ║
+╠══════════════════════════════════════════╣
+║  Security Grade:  B+                     ║
+║  Findings:  2 high · 5 medium · 3 low   ║
+║  Scanners:  20/20 passed                 ║
+╚══════════════════════════════════════════╝
 ```
 
-## IOC Blocklist
+## 🔧 CI/CD Integration
 
-The built-in blocklist is at `src/data/ioc-blocklist.json`. You can provide an external JSON file with the same format to extend it.
-
-## Development
-
-```bash
-npm install
-npm run build
-npm test
-```
-
-## Architecture
-
-- `src/types.ts` — Core type definitions (Scanner, Finding, ScanResult)
-- `src/scanner-registry.ts` — Scanner registration and orchestration
-- `src/scanners/` — Individual scanner implementations
-- `src/utils/` — Shared utilities (file walking, etc.)
-- `src/data/` — Static data (IOC blocklists)
-
-## OWASP MCP Top 10 Coverage
-
-Coverage mapping against the [OWASP MCP Top 10](https://github.com/OWASP/www-project-mcp-top-10) (v0.7.0):
-
-| # | Risk | Status | Scanner(s) |
-|---|------|--------|------------|
-| MCP01 | Token Mismanagement & Secret Exposure | ✅ Covered | Secret Leak Scanner |
-| MCP02 | Privilege Escalation via Scope Creep | ✅ Covered | Permission Analyzer, Hygiene Auditor |
-| MCP03 | Tool Poisoning | ✅ Covered | Prompt Injection Tester (tool injection patterns), Skill Auditor |
-| MCP04 | Software Supply Chain Attacks | ✅ Covered | Supply Chain Scanner, Convention Squatting Scanner |
-| MCP05 | Command Injection & Execution | ✅ Covered | Supply Chain Scanner (RCE detection), Red Team Simulator |
-| MCP06 | Prompt Injection via Contextual Payloads | ✅ Covered | Prompt Injection Tester (140+ patterns) |
-| MCP07 | Insufficient Authentication & Authorization | 🟡 Partial | MCP Config Auditor, Agent Config Auditor (config-level checks; no runtime auth enforcement) |
-| MCP08 | Insecure Data Handling | 🟡 Partial | Defense Analyzer, Environment Isolation Auditor (data flow analysis; no encryption validation) |
-| MCP09 | Logging & Monitoring Gaps | 🟡 Partial | Agent Config Auditor, Hygiene Auditor (checks for missing logging config; no log completeness analysis) |
-| MCP10 | Server-Side Request Forgery (SSRF) | 🔲 Planned | — |
-
-**Legend:** ✅ Covered — 🟡 Partial — 🔲 Planned
-
-## CI/CD Integration (GitHub Action)
-
-AgentShield provides a GitHub Action to automatically scan agent configurations in your CI/CD pipeline.
-
-### Quick Start
+### GitHub Actions
 
 ```yaml
-# .github/workflows/agentshield.yml
-name: AgentShield Security Scan
-
-on: [push, pull_request]
-
-jobs:
-  scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: TakumaLee/AgentShield@main
-        with:
-          scan-path: '.'
-          fail-on-critical: 'true'
-          output-format: 'text'
+- name: AgentShield Security Scan
+  uses: TakumaLee/AgentShield@main
+  with:
+    scan-path: '.'
+    fail-on-critical: 'true'
+    output-format: 'text'
 ```
 
-### Inputs
+#### Inputs
 
 | Input | Description | Default |
 |-------|-------------|---------|
@@ -137,23 +113,48 @@ jobs:
 | `fail-on-critical` | Fail workflow on critical findings | `true` |
 | `output-format` | Output format (`text` or `json`) | `text` |
 
-### Examples
-
-**Scan a specific directory with JSON output:**
+#### Examples
 
 ```yaml
+# Scan with JSON output
 - uses: TakumaLee/AgentShield@main
   with:
     scan-path: './agents'
     output-format: 'json'
-```
 
-**Warn on critical but don't fail:**
-
-```yaml
+# Warn on critical but don't fail
 - uses: TakumaLee/AgentShield@main
   with:
     fail-on-critical: 'false'
+```
+
+## 📦 Programmatic API
+
+```typescript
+import { ScannerRegistry, SupplyChainScanner, DxtSecurityScanner } from 'aiagentshield';
+
+const registry = new ScannerRegistry();
+registry.register(new SupplyChainScanner());
+registry.register(new DxtSecurityScanner());
+
+const report = await registry.runAll('./target-directory');
+console.log(report.summary);
+```
+
+## IOC Blocklist
+
+The built-in blocklist is at `src/data/ioc-blocklist.json`. Provide an external JSON file to extend it:
+
+```bash
+npx aiagentshield ./path/to/agent ./custom-ioc-blocklist.json
+```
+
+## Development
+
+```bash
+npm install
+npm run build
+npm test
 ```
 
 ## License
