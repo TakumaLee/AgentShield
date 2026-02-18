@@ -41,7 +41,16 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
     for (const item of items) {
       const fullPath = path.join(currentDir, item.name);
       if (item.isDirectory()) {
-        if (item.name === 'node_modules' || item.name === '.git') continue;
+        // Skip common large/irrelevant directories
+        const skipDirs = new Set([
+          'node_modules', '.git', 'dist', 'build', 'coverage',
+          'browser', 'Extensions', '.cache', 'Cache', 'CacheStorage',
+          'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
+          '.venv', 'venv', '.tox', '.mypy_cache',
+          'models', 'checkpoints', 'weights',  // ML model dirs
+          'sd-setup',  // Stable Diffusion
+        ]);
+        if (skipDirs.has(item.name)) continue;
         walk(fullPath);
       } else if (item.isFile()) {
         const ext = path.extname(item.name).toLowerCase();

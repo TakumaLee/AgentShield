@@ -32,7 +32,16 @@ export class VisualPromptInjectionScanner implements Scanner {
       }
     }
 
-    // Scan image files (walk separately since walkFiles doesn't include image extensions)
+    // Scan image files only in deep-scan mode (OCR is slow)
+    if (!process.env.AGENTSHIELD_DEEP_SCAN) {
+      return {
+        scanner: this.name,
+        findings,
+        scannedFiles,
+        duration: Date.now() - start,
+      };
+    }
+
     const imageFiles = this.findImageFiles(targetPath);
     for (const imagePath of imageFiles) {
       scannedFiles++;
@@ -61,7 +70,14 @@ export class VisualPromptInjectionScanner implements Scanner {
         for (const item of items) {
           const fullPath = path.join(currentDir, item.name);
           if (item.isDirectory()) {
-            if (item.name === 'node_modules' || item.name === '.git' || item.name === 'dist' || item.name === 'coverage') continue;
+            const skipDirs = new Set([
+              'node_modules', '.git', 'dist', 'build', 'coverage',
+              'browser', 'Extensions', '.cache', 'Cache', 'CacheStorage',
+              'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
+              '.venv', 'venv', '.tox', '.mypy_cache',
+              'models', 'checkpoints', 'weights', 'sd-setup',
+            ]);
+            if (skipDirs.has(item.name)) continue;
             walk(fullPath);
           } else if (item.isFile()) {
             const ext = path.extname(item.name).toLowerCase();
@@ -106,13 +122,32 @@ export class VisualPromptInjectionScanner implements Scanner {
         return findings;
       }
 
-      // Perform OCR on image
+      // Skip GIF files - multi-frame GIFs cause tesseract to hang
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.gif') {
+        return findings;
+      }
+
+      // Perform OCR on image with timeout
       const tesseract = await getTesseract();
       const worker = await tesseract.createWorker('eng', undefined, {
         logger: () => {}, // Disable logging to reduce noise
       });
       
-      const { data: { text } } = await worker.recognize(filePath);
+      const ocrTimeout = 30000; // 30 second timeout per image
+      const recognizePromise = worker.recognize(filePath);
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('OCR timeout')), ocrTimeout)
+      );
+      
+      let text: string;
+      try {
+        const result = await Promise.race([recognizePromise, timeoutPromise]);
+        text = (result as any).data.text;
+      } catch (e) {
+        await worker.terminate();
+        return findings;
+      }
       await worker.terminate();
 
       if (!text || text.trim().length === 0) {

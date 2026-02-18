@@ -69,6 +69,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --json             Output JSON report to stdout'));
   console.log(chalk.gray('    --output, -o FILE  Save report to file (auto-detects JSON by extension)'));
   console.log(chalk.gray('    --ioc PATH         Path to external IOC blocklist JSON file'));
+  console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx aiagentshield ./my-agent'));
@@ -93,6 +94,10 @@ async function main(): Promise<void> {
 
   // Parse flags
   const jsonMode = args.includes('--json');
+  const deepScan = args.includes('--deep-scan');
+  if (deepScan) {
+    process.env.AGENTSHIELD_DEEP_SCAN = '1';
+  }
 
   let outputPath: string | undefined;
   const outputIdx = args.findIndex((a) => a === '--output' || a === '-o');
