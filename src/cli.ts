@@ -2,73 +2,80 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import chalk from 'chalk';
 import { createDefaultRegistry } from './index';
-import { Finding, ScanReport } from './types';
+import { printReport, writeJsonReport } from './utils/reporter';
+import { calculateSummary } from './utils/scorer';
+import { ScannerModule } from './types';
 
-const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: '\x1b[41m\x1b[37m',
-  HIGH: '\x1b[31m',
-  MEDIUM: '\x1b[33m',
-  LOW: '\x1b[36m',
-};
-const RESET = '\x1b[0m';
+// ─── Profile filtering ──────────────────────────────────────────────────────
 
-function printReport(report: ScanReport): void {
-  console.log(`\n${'='.repeat(60)}`);
-  console.log(`  AgentShield Scan Report`);
-  console.log(`${'='.repeat(60)}`);
-  console.log(`  Target:    ${report.target}`);
-  console.log(`  Timestamp: ${report.timestamp}`);
-  console.log(`${'─'.repeat(60)}`);
+export type ProfileType = 'agent' | 'general' | 'mobile';
 
-  for (const result of report.results) {
-    console.log(`\n  Scanner: ${result.scanner}`);
-    console.log(`  Files scanned: ${result.filesScanned} | Duration: ${result.duration}ms`);
+const AGENT_ONLY_SCANNERS = new Set([
+  'Defense Analyzer',
+  'Red Team Simulator',
+  'Prompt Injection Tester',
+  'MCP Config Auditor',
+]);
 
-    if (result.findings.length === 0) {
-      console.log(`  ✅ No issues found`);
-      continue;
-    }
+const GENERAL_SCANNERS = new Set([
+  'Secret Leak Scanner',
+  'Permission Analyzer',
+  'Skill Auditor',
+]);
 
-    for (const f of result.findings) {
-      const color = SEVERITY_COLORS[f.severity] || '';
-      console.log(`\n  ${color}[${f.severity}]${RESET} ${f.rule}: ${f.message}`);
-      console.log(`    File: ${f.file}:${f.line}`);
-      console.log(`    Evidence: ${f.evidence}`);
-    }
-  }
+const MOBILE_SCANNERS = new Set([
+  'Secret Leak Scanner',
+  'Permission Analyzer',
+]);
 
-  console.log(`\n${'─'.repeat(60)}`);
-  console.log(`  Summary: ${report.totalFindings} findings`);
-  console.log(`    CRITICAL: ${report.criticalCount} | HIGH: ${report.highCount} | MEDIUM: ${report.mediumCount} | LOW: ${report.lowCount}`);
-  console.log(`${'='.repeat(60)}\n`);
+/**
+ * Filter a list of ScannerModules to only those relevant for a given profile.
+ * - agent:   all scanners (full AI-agent security audit)
+ * - general: secrets, permissions, skills
+ * - mobile:  secrets, permissions only
+ */
+export function filterScannersByProfile(
+  scanners: ScannerModule[],
+  profile: ProfileType
+): ScannerModule[] {
+  if (profile === 'agent') return scanners;
+  const allowlist = profile === 'mobile' ? MOBILE_SCANNERS : GENERAL_SCANNERS;
+  return scanners.filter((s) => allowlist.has(s.name));
 }
 
 function getVersion(): string {
-  const pkgPath = path.resolve(__dirname, '..', 'package.json');
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-  return pkg.version;
+  try {
+    const pkgPath = path.resolve(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version as string;
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function printHelp(): void {
-  console.log(`
-AgentShield v${getVersion()} — Security scanner for AI agent ecosystems
-
-Usage:
-  agentshield [options] [target-dir] [ioc-blocklist-path]
-
-Arguments:
-  target-dir           Directory to scan (default: current directory)
-  ioc-blocklist-path   Path to external IOC blocklist JSON file (optional)
-
-Options:
-  --help, -h           Show this help message
-  --version, -v        Show version number
-
-Examples:
-  npx aiagentshield ./my-agent
-  npx aiagentshield ./my-agent ./custom-ioc.json
-`);
+  console.log('');
+  console.log(chalk.bold.cyan('  🛡️  AgentShield') + chalk.gray(` v${getVersion()}`));
+  console.log(chalk.white('  Security scanner for AI Agent ecosystems'));
+  console.log('');
+  console.log(chalk.bold('  Usage:'));
+  console.log(chalk.gray('    npx aiagentshield [target-dir] [options]'));
+  console.log('');
+  console.log(chalk.bold('  Options:'));
+  console.log(chalk.gray('    --help, -h         Show help'));
+  console.log(chalk.gray('    --version, -v      Show version'));
+  console.log(chalk.gray('    --json             Output JSON report to stdout'));
+  console.log(chalk.gray('    --output, -o FILE  Save report to file (auto-detects JSON by extension)'));
+  console.log(chalk.gray('    --ioc PATH         Path to external IOC blocklist JSON file'));
+  console.log('');
+  console.log(chalk.bold('  Examples:'));
+  console.log(chalk.cyan('    npx aiagentshield ./my-agent'));
+  console.log(chalk.cyan('    npx aiagentshield ./my-agent --json'));
+  console.log(chalk.cyan('    npx aiagentshield ./my-agent --output report.json'));
+  console.log(chalk.cyan('    npx aiagentshield ./my-agent --ioc ./custom-ioc.json'));
+  console.log('');
 }
 
 async function main(): Promise<void> {
@@ -84,16 +91,82 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const positional = args.filter(a => !a.startsWith('-'));
-  const targetDir = positional[0] || process.cwd();
-  const iocPath = positional[1];
+  // Parse flags
+  const jsonMode = args.includes('--json');
+
+  let outputPath: string | undefined;
+  const outputIdx = args.findIndex((a) => a === '--output' || a === '-o');
+  if (outputIdx !== -1 && args[outputIdx + 1]) {
+    outputPath = args[outputIdx + 1];
+  }
+
+  let iocPath: string | undefined;
+  const iocIdx = args.findIndex((a) => a === '--ioc');
+  if (iocIdx !== -1 && args[iocIdx + 1]) {
+    iocPath = args[iocIdx + 1];
+  }
+
+  // Collect positional args (not flags or flag values)
+  const flagValuePositions = new Set<number>();
+  for (const flag of ['--output', '-o', '--ioc']) {
+    const idx = args.findIndex((a) => a === flag);
+    if (idx !== -1) flagValuePositions.add(idx + 1);
+  }
+  const positional = args.filter(
+    (a, i) => !a.startsWith('-') && !flagValuePositions.has(i)
+  );
+
+  const targetDir = path.resolve(positional[0] || process.cwd());
+  // Legacy: second positional was ioc path
+  if (!iocPath && positional[1]) {
+    iocPath = positional[1];
+  }
+
+  if (!fs.existsSync(targetDir)) {
+    console.error(chalk.red(`  ✗ Target directory not found: ${targetDir}`));
+    process.exit(1);
+  }
+
+  const version = getVersion();
+
+  if (!jsonMode) {
+    console.log('');
+    console.log(chalk.bold.cyan('  🛡️  AgentShield') + chalk.gray(` v${version}`));
+    console.log(chalk.gray(`  Scanning: ${targetDir}`));
+    console.log('');
+  }
+
   const registry = createDefaultRegistry(iocPath);
-  const report = await registry.runAll(path.resolve(targetDir));
-  printReport(report);
-  process.exit((report.criticalCount ?? 0) > 0 ? 2 : (report.highCount ?? 0) > 0 ? 1 : 0);
+  const report = await registry.runAll(targetDir);
+
+  // Ensure summary is populated (registry.runAll now always sets it, but be safe)
+  if (!report.summary) {
+    report.summary = calculateSummary(report.results);
+  }
+  report.version = version;
+
+  if (jsonMode) {
+    // Output JSON to stdout
+    console.log(JSON.stringify(report, null, 2));
+  } else if (outputPath && (outputPath.endsWith('.json'))) {
+    // Save JSON to file, print summary to console
+    printReport(report);
+    writeJsonReport(report, outputPath);
+  } else if (outputPath) {
+    // Save JSON to file (any extension treated as JSON)
+    printReport(report);
+    writeJsonReport(report, outputPath);
+  } else {
+    // Default: pretty print
+    printReport(report);
+  }
+
+  // Exit code: 2 = critical, 1 = high, 0 = ok
+  const s = report.summary;
+  process.exit(s.critical > 0 ? 2 : s.high > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
-  console.error('Fatal error:', err);
+  console.error(chalk.red('Fatal error:'), err);
   process.exit(1);
 });

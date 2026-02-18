@@ -1,0 +1,9 @@
+agent:
+  name: my-agent
+  permissions:
+    filesystem: "*"
+    network: "*"
+    execute: true
+  sandbox: false
+  trust_all_skills: true
+  auto_approve_tools: true
