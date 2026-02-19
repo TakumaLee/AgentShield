@@ -263,6 +263,213 @@ const persistenceRule: Rule = {
   },
 };
 
+// --- Python Supply Chain Rules ---
+
+/** Known malicious or typosquatted PyPI package names */
+const MALICIOUS_PYTHON_PACKAGES: Array<{ name: string; reason: string }> = [
+  // Typosquatting of popular packages
+  { name: 'setup-tools', reason: 'typosquatting setuptools' },
+  { name: 'colourama', reason: 'typosquatting colorama' },
+  { name: 'colurama', reason: 'typosquatting colorama' },
+  { name: 'requets', reason: 'typosquatting requests' },
+  { name: 'request', reason: 'typosquatting requests (singular)' },
+  { name: 'python-dateutil2', reason: 'typosquatting python-dateutil' },
+  { name: 'py-openssl', reason: 'typosquatting pyOpenSSL' },
+  { name: 'urlib3', reason: 'typosquatting urllib3' },
+  { name: 'urllib', reason: 'typosquatting urllib3 / stdlib masquerade' },
+  { name: 'pycrypto', reason: 'abandoned/compromised; use pycryptodome' },
+  { name: 'openssl', reason: 'fake PyPI masquerade of OpenSSL C library' },
+  { name: 'builtins', reason: 'PyPI masquerade of Python stdlib builtins' },
+  { name: 'ctx', reason: 'known malicious package (supply-chain attack 2022)' },
+  { name: 'b4nana', reason: 'known malicious test package' },
+  { name: 'importantpackage', reason: 'known malicious package' },
+  { name: 'importantlib', reason: 'known malicious package' },
+  { name: 'loglib-modules', reason: 'known malicious package' },
+  { name: 'httpx-async', reason: 'typosquatting httpx' },
+  { name: 'aiohttp-requests', reason: 'suspicious combination package' },
+  { name: 'python-sqlite', reason: 'fake package masquerading stdlib sqlite3' },
+  { name: 'python-jwt', reason: 'malicious package (CVE-2022-39227)' },
+  { name: 'pyjwt2', reason: 'typosquatting PyJWT' },
+  { name: 'pytest-async', reason: 'typosquatting pytest-asyncio' },
+  { name: 'nmap', reason: 'fake PyPI nmap masquerade' },
+  { name: 'pip', reason: 'PyPI pip masquerade (do not install pip as a dependency)' },
+  { name: 'python3', reason: 'PyPI python3 masquerade' },
+];
+
+/** Check whether a filename is a Python dependency manifest */
+function isPythonDepFile(filename: string): boolean {
+  const base = path.basename(filename).toLowerCase();
+  return (
+    base === 'requirements.txt' ||
+    base.startsWith('requirements') && base.endsWith('.txt') ||
+    base === 'pyproject.toml' ||
+    base === 'setup.py' ||
+    base === 'setup.cfg' ||
+    base === 'pipfile' ||
+    base === 'pipfile.lock'
+  );
+}
+
+/**
+ * Extract package names from a requirements.txt-style line.
+ * Handles: pkg==1.0, pkg>=1.0, pkg[extra], pkg @ url, -r other.txt, etc.
+ */
+function extractRequirementsPkgName(line: string): string | null {
+  const trimmed = line.trim();
+  // Skip comments, blank lines, options flags
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('-')) return null;
+  // Handle VCS / URL requirements — keep raw for URL scanning
+  if (trimmed.includes('://')) return null;
+  // Strip extras, version specifiers, environment markers
+  const match = trimmed.match(/^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)/);
+  return match ? match[1].toLowerCase() : null;
+}
+
+/** Normalize PyPI package name: lowercase, replace - and _ */
+function normalizePkg(name: string): string {
+  return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+const SUSPICIOUS_REQUIREMENT_URL = /(?:git\+https?|git\+ssh|hg\+https?|svn\+https?|https?):\/\/(?!github\.com|gitlab\.com|bitbucket\.org|pypi\.org|files\.pythonhosted\.org)[^\s#]+/gi;
+
+const pythonPackageRule: Rule = {
+  id: 'SUPPLY-007',
+  severity: 'critical',
+  check(file: FileEntry): Finding[] {
+    if (!isPythonDepFile(file.path)) return [];
+    const findings: Finding[] = [];
+    const lines = file.content.split('\n');
+
+    const maliciousNormalized = new Map(
+      MALICIOUS_PYTHON_PACKAGES.map((p) => [normalizePkg(p.name), p.reason])
+    );
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const pkgName = extractRequirementsPkgName(line);
+      if (!pkgName) continue;
+      const normalized = normalizePkg(pkgName);
+      const reason = maliciousNormalized.get(normalized);
+      if (reason) {
+        findings.push({
+          scanner: 'SupplyChainScanner',
+          rule: 'SUPPLY-007',
+          severity: 'critical',
+          file: file.relativePath,
+          line: i + 1,
+          message: `Known malicious/typosquatted Python package: ${pkgName} (${reason})`,
+          evidence: line.trim().substring(0, 120),
+        });
+      }
+    }
+
+    // Also scan pyproject.toml and setup.py for package names in string context
+    if (file.path.endsWith('pyproject.toml') || file.path.endsWith('setup.py') || file.path.endsWith('setup.cfg')) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Match quoted package names in dependency arrays/lists
+        const pkgMatches = line.matchAll(/["']([A-Za-z0-9][A-Za-z0-9._-]*(?:\[.*?\])?(?:[>=<!~^][^\s"',;]+)?)/g);
+        for (const m of pkgMatches) {
+          const rawName = m[1].split(/[>=<!~^\[;]/)[0].trim();
+          if (!rawName) continue;
+          const normalized = normalizePkg(rawName);
+          const reason = maliciousNormalized.get(normalized);
+          if (reason) {
+            findings.push({
+              scanner: 'SupplyChainScanner',
+              rule: 'SUPPLY-007',
+              severity: 'critical',
+              file: file.relativePath,
+              line: i + 1,
+              message: `Known malicious/typosquatted Python package: ${rawName} (${reason})`,
+              evidence: line.trim().substring(0, 120),
+            });
+          }
+        }
+      }
+    }
+
+    return findings;
+  },
+};
+
+const pythonURLRequirementRule: Rule = {
+  id: 'SUPPLY-008',
+  severity: 'high',
+  check(file: FileEntry): Finding[] {
+    if (!isPythonDepFile(file.path)) return [];
+    const findings: Finding[] = [];
+    const lines = file.content.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const regex = new RegExp(SUSPICIOUS_REQUIREMENT_URL.source, 'gi');
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(trimmed)) !== null) {
+        findings.push({
+          scanner: 'SupplyChainScanner',
+          rule: 'SUPPLY-008',
+          severity: 'high',
+          file: file.relativePath,
+          line: i + 1,
+          message: 'Suspicious URL-based Python dependency (non-trusted host)',
+          evidence: match[0].substring(0, 120),
+        });
+      }
+    }
+
+    return findings;
+  },
+};
+
+const SETUP_PY_DANGEROUS: Array<{ pattern: RegExp; desc: string }> = [
+  // cmdclass overriding install/develop (postinstall hook)
+  { pattern: /cmdclass\s*=\s*\{[^}]*['"]install['"]\s*:/g, desc: 'cmdclass["install"] override (postinstall hook)' },
+  { pattern: /cmdclass\s*=\s*\{[^}]*['"]develop['"]\s*:/g, desc: 'cmdclass["develop"] override (postinstall hook)' },
+  { pattern: /cmdclass\s*=\s*\{[^}]*['"]egg_info['"]\s*:/g, desc: 'cmdclass["egg_info"] override (install hook)' },
+  // subprocess / os.system calls in setup.py context
+  { pattern: /\bsubprocess\s*\.\s*(?:call|run|Popen|check_call|check_output)\s*\(/g, desc: 'subprocess execution in setup.py' },
+  { pattern: /\bos\s*\.\s*system\s*\(/g, desc: 'os.system() call in setup.py' },
+  { pattern: /\bos\s*\.\s*popen\s*\(/g, desc: 'os.popen() call in setup.py' },
+  // Network fetching inside setup.py
+  { pattern: /\burllib\s*\.\s*request\s*\.\s*urlretrieve\s*\(/g, desc: 'urllib network fetch in setup.py' },
+  { pattern: /\brequests\s*\.\s*(?:get|post|put)\s*\(/g, desc: 'requests network call in setup.py' },
+  // exec/eval with variable content
+  { pattern: /\bexec\s*\(\s*(?!['"])/g, desc: 'exec() with dynamic argument in setup.py' },
+  { pattern: /\beval\s*\(\s*(?!['"])/g, desc: 'eval() with dynamic argument in setup.py' },
+];
+
+const setupPyRule: Rule = {
+  id: 'SUPPLY-009',
+  severity: 'critical',
+  check(file: FileEntry): Finding[] {
+    const basename = path.basename(file.path).toLowerCase();
+    if (basename !== 'setup.py') return [];
+    const findings: Finding[] = [];
+
+    for (const { pattern, desc } of SETUP_PY_DANGEROUS) {
+      const regex = new RegExp(pattern.source, pattern.flags);
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(file.content)) !== null) {
+        findings.push({
+          scanner: 'SupplyChainScanner',
+          rule: 'SUPPLY-009',
+          severity: 'critical',
+          file: file.relativePath,
+          line: findLineNumber(file.content, match.index),
+          message: `Dangerous setup.py pattern: ${desc}`,
+          evidence: match[0].substring(0, 120),
+        });
+      }
+    }
+
+    return findings;
+  },
+};
+
 // --- Scanner class ---
 
 export class SupplyChainScanner implements Scanner {
@@ -280,6 +487,9 @@ export class SupplyChainScanner implements Scanner {
       credentialRule,
       exfilRule,
       persistenceRule,
+      pythonPackageRule,
+      pythonURLRequirementRule,
+      setupPyRule,
     ];
   }
 

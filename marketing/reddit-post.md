@@ -10,12 +10,13 @@ This affects 10,000+ active users and 50+ DXT extensions. The core issue isn't j
 
 ## What we built
 
-I've been working on [**AgentShield**](https://github.com/TakumaLee/AgentShield), an open-source CLI that scans AI Agent projects for security issues. It runs **13 scanners** covering:
+I've been working on [**AgentShield**](https://github.com/TakumaLee/AgentShield), an open-source CLI that scans AI Agent projects for security issues. It runs **20 scanners** covering:
 
 - **Supply Chain Scanner** — detects vulnerable or malicious dependencies
 - **Deployment Hygiene Auditor** — checks for leaked secrets, misconfigured permissions
 - **Convention File Squatting Detector** — catches malicious files disguised as config files (AGENTS.md, .cursorrules, etc.)
-- And 10 more covering prompt injection surface, MCP config risks, etc.
+- **DXT Security Scanner** — flags unsandboxed extensions and dangerous permission combinations
+- And 16 more covering prompt injection surface, MCP config risks, visual prompt injection, and more (v0.8.1)
 
 We're also building a **DXT Scanner** specifically designed to flag unsandboxed extensions and dangerous permission combinations — directly inspired by this vulnerability class.
 
@@ -29,7 +30,7 @@ npx aiagentshield /path/to/project
 **Web (scan any GitHub repo):**
 Just paste a GitHub URL at [agentshield-web.vercel.app](https://agentshield-web.vercel.app) — no signup, no cost.
 
-It's fully open source: [github.com/TakumaLee/AgentShield](https://github.com/TakumaLee/AgentShield)
+It's fully open source (latest: v0.8.1 with Security Grade + 20 scanners): [github.com/TakumaLee/AgentShield](https://github.com/TakumaLee/AgentShield)
 
 ## Discussion
 
